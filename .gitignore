@@ -1,0 +1,23 @@
+# PlatformIO
+esp32/.pio/
+esp32/.pioenvs/
+esp32/.piolibdeps/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Compiled objects
+*.o
+*.a
+*.elf
+*.bin
+*.hex
+
+# VESC Tool backups
+*.bak
+
+# Temp
+temp.txt

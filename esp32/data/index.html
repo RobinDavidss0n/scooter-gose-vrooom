@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>ScooterCtrl</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- =========================================================
+       Header
+  ========================================================== -->
+  <header>
+    <div class="logo">⚡ ScooterCtrl</div>
+    <div id="conn-dot" class="dot dot-red" title="Not connected"></div>
+  </header>
+
+  <!-- =========================================================
+       Tab bar
+  ========================================================== -->
+  <nav class="tabbar">
+    <button class="tab active" data-tab="dashboard">Dashboard</button>
+    <button class="tab" data-tab="stats">Stats</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </nav>
+
+  <!-- =========================================================
+       TAB: Dashboard
+  ========================================================== -->
+  <section id="tab-dashboard" class="tab-content active">
+
+    <!-- Speedometer -->
+    <div class="speedo-wrap">
+      <svg class="speedo" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background arc -->
+        <circle id="speed-bg"   cx="100" cy="100" r="85" fill="none"
+                stroke="#1a1a2e" stroke-width="14"
+                stroke-dasharray="404 566"
+                stroke-dashoffset="-81"
+                stroke-linecap="round"/>
+        <!-- Speed arc (filled) -->
+        <circle id="speed-arc"  cx="100" cy="100" r="85" fill="none"
+                stroke="#00aaff" stroke-width="14"
+                stroke-dasharray="0 566"
+                stroke-dashoffset="-81"
+                stroke-linecap="round"
+                transform="rotate(-135 100 100)"/>
+        <!-- Battery ring (inner) -->
+        <circle id="bat-bg"     cx="100" cy="100" r="68" fill="none"
+                stroke="#1a1a2e" stroke-width="8"
+                stroke-dasharray="323 427"
+                stroke-dashoffset="-65"
+                stroke-linecap="round"/>
+        <circle id="bat-arc"    cx="100" cy="100" r="68" fill="none"
+                stroke="#44dd88" stroke-width="8"
+                stroke-dasharray="323 427"
+                stroke-dashoffset="-65"
+                stroke-linecap="round"
+                transform="rotate(-135 100 100)"/>
+      </svg>
+
+      <!-- Overlaid text -->
+      <div class="speedo-center">
+        <div id="speed-val" class="speed-number">0</div>
+        <div class="speed-unit">km/h</div>
+        <div id="mode-label" class="mode-badge sport">SPORT</div>
+      </div>
+    </div>
+
+    <!-- Info cards row -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-icon">🔋</div>
+        <div id="bat-pct" class="card-val">—</div>
+        <div class="card-label">Battery</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <div id="power-val" class="card-val">—</div>
+        <div class="card-label">Power</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🌡️</div>
+        <div id="temp-val" class="card-val">—</div>
+        <div class="card-label">FET temp</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚙️</div>
+        <div id="current-val" class="card-val">—</div>
+        <div class="card-label">Current</div>
+      </div>
+    </div>
+
+    <!-- Mode selector -->
+    <div class="mode-row">
+      <button class="mode-btn" data-mode="eco">🌿 ECO</button>
+      <button class="mode-btn active" data-mode="sport">⚡ SPORT</button>
+      <button class="mode-btn" data-mode="turbo">🔥 TURBO</button>
+    </div>
+
+    <!-- Fault banner (hidden unless fault) -->
+    <div id="fault-banner" class="fault-banner hidden">
+      <span id="fault-text">FAULT</span>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       TAB: Stats
+  ========================================================== -->
+  <section id="tab-stats" class="tab-content">
+    <h2 class="section-title">Session Stats</h2>
+    <div class="stat-grid">
+      <div class="stat-row">
+        <span class="stat-label">Voltage</span>
+        <span id="stat-voltage" class="stat-val">— V</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Motor current</span>
+        <span id="stat-motor-a" class="stat-val">— A</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Input current</span>
+        <span id="stat-input-a" class="stat-val">— A</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Duty cycle</span>
+        <span id="stat-duty" class="stat-val">— %</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">ERPM</span>
+        <span id="stat-rpm" class="stat-val">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Motor temp</span>
+        <span id="stat-temp-motor" class="stat-val">— °C</span>
+      </div>
+      <div class="stat-row divider">
+        <span class="stat-label">Amp-hours used</span>
+        <span id="stat-ah" class="stat-val">— Ah</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Watt-hours used</span>
+        <span id="stat-wh" class="stat-val">— Wh</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Wh regenerated</span>
+        <span id="stat-wh-regen" class="stat-val green">— Wh</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       TAB: Settings
+  ========================================================== -->
+  <section id="tab-settings" class="tab-content">
+    <h2 class="section-title">Connection</h2>
+    <div class="stat-grid">
+      <div class="stat-row">
+        <span class="stat-label">WiFi</span>
+        <span class="stat-val accent">ScooterControl</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">IP address</span>
+        <span class="stat-val">192.168.4.1</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">BLE name</span>
+        <span class="stat-val">ScooterCtrl</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">WS clients</span>
+        <span id="ws-clients" class="stat-val">1</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">VESC status</span>
+        <span id="vesc-status" class="stat-val">—</span>
+      </div>
+    </div>
+
+    <h2 class="section-title">About</h2>
+    <div class="stat-grid">
+      <div class="stat-row">
+        <span class="stat-label">Firmware</span>
+        <span class="stat-val">scooter-gose-vrooom v1.0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Hardware</span>
+        <span class="stat-val">ESP32-S3 + VESC MINI 6.7</span>
+      </div>
+    </div>
+
+    <div class="settings-note">
+      Connect phone to WiFi: <strong>ScooterControl</strong><br>
+      Password: <strong>scoot1234</strong><br>
+      Then open: <strong>http://192.168.4.1</strong>
+    </div>
+  </section>
+
+  <!-- Status bar -->
+  <footer>
+    <span id="last-update">Connecting…</span>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
