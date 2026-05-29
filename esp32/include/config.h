@@ -21,6 +21,41 @@
 #define TOUCH_RST   5   // CST816S reset
 
 // ------------------------------------------------------------------------------
+// Input hardware — throttle, brake, buttons, indicators
+// (Responsibility analysis: all inputs route through ESP32, not directly to
+//  the VESC.  ESP32 reads ADC/GPIO, applies mode limits, then sends
+//  COMM_SET_CURRENT / COMM_SET_CURRENT_BRAKE to the VESC over UART.
+//  This gives software control of speed limiting, ride modes, throttle curves,
+//  and graceful shutdown. See emulator/README.md for full wiring details.)
+// ------------------------------------------------------------------------------
+
+// Hall-effect throttle (0.8 V idle → 4.2 V full).
+// Use a 3.9 kΩ / 10 kΩ voltage divider to stay within 3.3 V ADC range.
+#define THROTTLE_PIN        1     // ADC1_CH0
+
+// Brake lever — digital switch (active LOW, 10 kΩ pull-up) or Hall analog.
+// Analog: read ADC and send proportional COMM_SET_CURRENT_BRAKE.
+// Digital: send fixed regen current on press.
+#define BRAKE_PIN           2     // GPIO (digital) or ADC1_CH1 (analog)
+#define BRAKE_REGEN_AMPS    8.0f  // regen current for digital brake switch
+
+// Turn signal buttons (active LOW, 10 kΩ pull-up)
+#define BTN_TURN_LEFT       13
+#define BTN_TURN_RIGHT      14
+
+// Power button (active LOW, 10 kΩ pull-up)
+// Short press: cycle display or reserved.  Long press (> 2 s): shutdown.
+#define BTN_POWER           21
+#define POWER_LONG_PRESS_MS 2000
+
+// Turn signal LEDs (active HIGH)
+#define LED_TURN_LEFT       15
+#define LED_TURN_RIGHT      16
+
+// Turn-signal blink period (ms)
+#define BLINK_PERIOD_MS     500
+
+// ------------------------------------------------------------------------------
 // VESC UART
 // ------------------------------------------------------------------------------
 #define VESC_TX          17   // ESP32 TX → VESC RX
