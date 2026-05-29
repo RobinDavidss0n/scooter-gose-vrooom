@@ -18,6 +18,7 @@ const RideMode RIDE_MODES[] = {
     { "ECO",   8.0f,  6.0f,  7000,  0x00c48c },
     { "SPORT", 20.0f, 15.0f, 11000, 0x00aaff },
     { "TURBO", 30.0f, 20.0f, 13000, 0xff4444 },
+    // Uncapped speed?
 };
 const int RIDE_MODE_COUNT = 3;
 
@@ -49,7 +50,7 @@ static void vescPollTask(void*) {
     VescValues local;
     int        last_applied_mode = -1;  // track when mode changes
 
-    for (;;) {
+    while (true) {
         const int mode = gModeIdx;
         const RideMode& m = RIDE_MODES[mode];
 
@@ -90,7 +91,7 @@ static void vescPollTask(void*) {
 // Prevents the VESC's UART timeout from firing.
 // ==============================================================================
 static void vescAliveTask(void*) {
-    for (;;) {
+    while (true) {
         gVesc.sendAlive();
         vTaskDelay(pdMS_TO_TICKS(VESC_ALIVE_MS));
     }
@@ -105,7 +106,7 @@ static void vescAliveTask(void*) {
 static void displayTask(void*) {
     int lastModeIdx = -1;   // detect mode changes from BLE/web
 
-    for (;;) {
+    while (true) {
         // Snapshot the latest values (mutex-protected)
         VescValues snap;
         if (xSemaphoreTake(gValuesMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
