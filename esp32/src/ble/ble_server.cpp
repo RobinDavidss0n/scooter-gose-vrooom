@@ -130,8 +130,7 @@ void BleServer::NusRxCallbacks::onWrite(BLECharacteristic* chr) {
     if (val.equalsIgnoreCase("mode:eco"))   newMode = 0;
     else if (val.equalsIgnoreCase("mode:sport")) newMode = 1;
     else if (val.equalsIgnoreCase("mode:turbo")) newMode = 2;
-    else if (val.equalsIgnoreCase("ping"))   { chr->setValue("pong
-"); return; }
+    else if (val.equalsIgnoreCase("ping"))   { chr->setValue("pong"); return; }
 
     if (newMode >= 0 && _parent->_modeCallback) {
         _parent->_modeCallback(newMode);

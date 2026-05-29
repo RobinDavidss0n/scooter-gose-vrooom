@@ -137,11 +137,11 @@
 #define LV_USE_ARC       1
 #define LV_USE_BAR       1
 #define LV_USE_BTN       1
-#define LV_USE_BTNMATRIX 0
+#define LV_USE_BTNMATRIX 1
 #define LV_USE_CANVAS    0
 #define LV_USE_CHECKBOX  0
 #define LV_USE_DROPDOWN  1
-#define LV_USE_IMG       0
+#define LV_USE_IMG       1
 #define LV_USE_LABEL     1
 #define LV_USE_LINE      0
 #define LV_USE_ROLLER    0
@@ -162,6 +162,7 @@
 #define LV_USE_SPINBOX   0
 #define LV_USE_SPINNER   1
 #define LV_USE_TABVIEW   1
+#define LV_USE_CALENDAR  0
 #define LV_USE_TILEVIEW  0
 #define LV_USE_WIN       0
 

@@ -18,10 +18,6 @@ void UIManager::setMode(int modeIdx) {
     if (_dashboard) _dashboard->setMode(modeIdx);
 }
 
-void UIManager::setMode(int modeIdx) {
-    if (_dashboard) _dashboard->setMode(modeIdx);
-}
-
 void UIManager::switchTo(Screen s) {
     _current = s;
     switch (s) {

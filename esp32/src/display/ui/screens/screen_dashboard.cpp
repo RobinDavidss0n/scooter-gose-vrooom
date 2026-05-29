@@ -1,6 +1,7 @@
 #include "screen_dashboard.h"
 #include "display/ui/ui_manager.h"
 #include "config.h"
+#include <Arduino.h>
 #include <stdio.h>
 
 // Colour palette

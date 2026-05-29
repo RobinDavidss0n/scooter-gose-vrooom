@@ -1,5 +1,6 @@
 #include "screen_settings.h"
 #include "display/ui/ui_manager.h"
+#include <Arduino.h>
 
 static constexpr uint32_t S_BG   = 0x0a0a12;
 static constexpr uint32_t S_ACC  = 0x00aaff;
