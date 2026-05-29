@@ -18,6 +18,3 @@ esp32/.piolibdeps/
 
 # VESC Tool backups
 *.bak
-
-# Temp
-temp.txt
