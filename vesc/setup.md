@@ -19,3 +19,5 @@ Setup the ESC using the [VESC tool](https://vesc-project.com/vesc_tool).
    - Motor poles: 30
    - Temperature sensor: NTC 10k at 25C
    - Beta value for motor thermistor: 3380K
+
+## Settings after the wizard
