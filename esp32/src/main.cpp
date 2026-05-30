@@ -81,7 +81,10 @@ void setup_right_blinker_icon()
 {
     // Create the right_blinker icon object
     lv_obj_t * img_right_blinker = lv_img_create(lv_scr_act());
-    lv_img_set_src(img_right_blinker, &right_blinker);
+    lv_img_set_src(img_right_blinker, &left_blinker);
+
+    // LVGL uses 0.1 degree units, so 180 degrees = 1800
+    lv_img_set_angle(img_right_blinker, 1800);
 
     // LVGL Zoom: 256 = 100%. Keep matching scale with the left side
     lv_img_set_zoom(img_right_blinker, 20); 
