@@ -1,124 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  VESC Motor Configuration — Xiaomi Elite NE
-  Target ESC: Makerbase VESC MINI 6.7 (VESC 6.6 firmware)
-
-  IMPORTANT: Run motor detection wizard first! The R/L/flux linkage values
-  below are placeholders — your actual motor will differ. Only the limit
-  parameters (l_current_max etc.) and motor geometry (motor_poles) are
-  reliable starting points.
-
-  Import via: VESC Tool → Motor Settings → Import XML
+  Partial XML for a new motor on the same scooter platform.
+  Run FOC and hall detection first, then apply this file to restore the
+  scooter-level limits and display metadata.
 -->
 <MCConfiguration>
-
-  <!-- =====================================================================
-       Motor Geometry
-       ===================================================================== -->
-  <!-- Xiaomi Elite NE hub motor: ~15 pole pairs (30 magnets).
-       Verify by counting magnets or using VESC Tool's pole pair detection. -->
-  <motor_poles>30</motor_poles>
-
-  <!-- Motor type: 2=FOC (preferred), 0=BLDC -->
   <motor_type>2</motor_type>
+  <foc_sensor_mode>2</foc_sensor_mode>
 
-  <!-- Sensor mode: 2=Hall sensors, 0=Sensorless, 4=HFI sensorless start -->
-  <sensor_mode>2</sensor_mode>
-
-  <!-- =====================================================================
-       Current Limits
-       Start conservative, raise only after verifying thermals!
-       ===================================================================== -->
-  <!-- Max motor winding current (A). Hub motors typically handle 20-30 A. -->
-  <l_current_max>25.0</l_current_max>
-
-  <!-- Min (regen/braking) motor current. Negative = regenerative braking. -->
+  <l_current_max>30.0</l_current_max>
   <l_current_min>-20.0</l_current_min>
-
-  <!-- Max battery input current (A). Match or stay below fuse rating. -->
   <l_in_current_max>20.0</l_in_current_max>
-
-  <!-- Max battery regen current (A). Limits charge current during braking. -->
   <l_in_current_min>-10.0</l_in_current_min>
+  <l_abs_current_max>46.66</l_abs_current_max>
 
-  <!-- Absolute max instantaneous current — hardware protection threshold. -->
-  <l_abs_current_max>60.0</l_abs_current_max>
+  <l_battery_cut_start>34.0</l_battery_cut_start>
+  <l_battery_cut_end>30.0</l_battery_cut_end>
 
-  <!-- =====================================================================
-       Voltage Limits (10S LiPo = 36 V nominal, 42 V full, 33 V cutoff)
-       ===================================================================== -->
-  <l_battery_cut_start>33.5</l_battery_cut_start>
-  <l_battery_cut_end>31.0</l_battery_cut_end>
+  <l_temp_fet_start>85.0</l_temp_fet_start>
+  <l_temp_fet_end>100.0</l_temp_fet_end>
+  <l_temp_motor_start>85.0</l_temp_motor_start>
+  <l_temp_motor_end>100.0</l_temp_motor_end>
 
-  <!-- =====================================================================
-       Speed Limits
-       30 km/h on Xiaomi Elite NE 8.5" wheel ≈ 11,000 ERPM
-       ===================================================================== -->
-  <!-- Forward max ERPM (~30 km/h). Reduce for road-legal 25 km/h ≈ 9,200. -->
-  <l_max_erpm>11000.0</l_max_erpm>
-
-  <!-- Reverse ERPM limit (small, for safety) -->
-  <l_min_erpm>-500.0</l_min_erpm>
-
-  <!-- ERPM at which current limiting starts (soft speed limit ramp) -->
-  <l_erpm_start>0.3</l_erpm_start>
-
-  <!-- =====================================================================
-       Temperature Limits
-       ===================================================================== -->
-  <!-- FET temperature: start throttling at 80°C, cut at 90°C -->
-  <l_temp_fet_start>80.0</l_temp_fet_start>
-  <l_temp_fet_end>90.0</l_temp_fet_end>
-
-  <!-- Motor temperature (if NTC sensor wired): throttle at 100°C, cut 120°C -->
-  <l_temp_motor_start>100.0</l_temp_motor_start>
-  <l_temp_motor_end>120.0</l_temp_motor_end>
-
-  <!-- =====================================================================
-       FOC Parameters — PLACEHOLDERS, overwrite with motor detection results!
-       ===================================================================== -->
-  <!-- Motor resistance (Ohm) — measured by detection wizard -->
-  <foc_motor_r>0.07</foc_motor_r>
-
-  <!-- Motor inductance (H) — measured by detection wizard -->
-  <foc_motor_l>0.000012</foc_motor_l>
-
-  <!-- Flux linkage (Wb) — measured by detection wizard -->
-  <foc_motor_flux_linkage>0.014</foc_motor_flux_linkage>
-
-  <!-- Observer gain: higher = faster response but more noise (1e6–1e9 range) -->
-  <foc_observer_gain>9.0e6</foc_observer_gain>
-
-  <!-- Current controller bandwidth (rad/s) — auto-calculated from R/L -->
-  <foc_current_kp>0.03</foc_current_kp>
-  <foc_current_ki>30.0</foc_current_ki>
-
-  <!-- Speed controller -->
-  <foc_speed_kp>0.003</foc_speed_kp>
-  <foc_speed_ki>0.004</foc_speed_ki>
-
-  <!-- Switching frequency (Hz) — 30 kHz is quiet and efficient -->
-  <foc_f_zv>30000.0</foc_f_zv>
-
-  <!-- Hall sensor interpolation -->
-  <foc_hall_interp_erpm>500.0</foc_hall_interp_erpm>
-
-  <!-- =====================================================================
-       Throttle / Ramp Settings
-       ===================================================================== -->
-  <!-- Current ramp rate (A/s) — smoother = gentler acceleration -->
-  <l_current_max_scale>1.0</l_current_max_scale>
-  <l_current_min_scale>1.0</l_current_min_scale>
-
-  <!-- Duty cycle ramp rate -->
-  <m_duty_ramp_step>0.0025</m_duty_ramp_step>
-
-  <!-- =====================================================================
-       Wheel & Speed Display
-       Wheel diameter: 8.5" pneumatic = ~216 mm
-       ===================================================================== -->
   <si_motor_poles>30</si_motor_poles>
   <si_gear_ratio>1.0</si_gear_ratio>
-  <si_wheel_diameter>0.216</si_wheel_diameter>
-
+  <si_wheel_diameter>0.254</si_wheel_diameter>
+  <si_battery_type>0</si_battery_type>
+  <si_battery_cells>10</si_battery_cells>
+  <si_battery_ah>10.0</si_battery_ah>
+  <si_motor_nl_current>1.0</si_motor_nl_current>
 </MCConfiguration>

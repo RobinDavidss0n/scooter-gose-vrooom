@@ -1,94 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  VESC Application Configuration — Xiaomi Elite NE
-  Target ESC: Makerbase VESC MINI 6.7
-
-  Application: UART
-  The ESP32-S3 controls the VESC exclusively via UART at 115200 baud.
-  The ADC throttle is also enabled as a fallback / emergency mode.
-
-  Import via: VESC Tool → App Settings → Import XML
--->
+<!-- Partial XML for the controller-side app settings that survive a motor swap. -->
 <APPConfiguration>
-
-  <!-- =====================================================================
-       Application selection
-       0=None, 1=PPM, 2=ADC, 3=UART, 4=PPM+UART, 5=ADC+UART, 8=Custom
-       Use ADC+UART (5) so physical throttle works AND UART control works
-       ===================================================================== -->
-  <app_to_use>5</app_to_use>
-
-  <!-- =====================================================================
-       UART App Settings
-       ===================================================================== -->
-  <app_uart_conf>
-    <!-- Baud rate: must match VESC_BAUD in esp32/include/config.h -->
-    <baud_rate>115200</baud_rate>
-
-    <!-- Send CAN status on this interface (false = don't broadcast CAN frames) -->
-    <send_can_status>false</send_can_status>
-  </app_uart_conf>
-
-  <!-- =====================================================================
-       ADC App Settings (physical throttle — fallback mode)
-       Calibrate min/max voltages with actual throttle connected!
-       ===================================================================== -->
-  <app_adc_conf>
-    <!-- Control type: 0=Current, 1=Current no reverse, 2=Current no reverse brake center,
-                       3=Duty, 4=Duty no reverse -->
-    <ctrl_type>1</ctrl_type>
-
-    <!-- Throttle input channel: 0=ADC1, 1=ADC2 -->
-    <channel>0</channel>
-
-    <!-- Voltage at rest / zero throttle (V) — measure with multimeter -->
-    <voltage1_start>0.85</voltage1_start>
-
-    <!-- Voltage at full throttle (V) -->
-    <voltage1_end>2.75</voltage1_end>
-
-    <!-- Use throttle as brake when below center (for ADC-mode only) -->
-    <use_filter>true</use_filter>
-
-    <!-- Ramp time (s) — how fast throttle responds -->
-    <ramp_time_pos>0.3</ramp_time_pos>
-    <ramp_time_neg>0.1</ramp_time_neg>
-
-    <!-- Multi-ESC: throttle this VESC and send to CAN peers -->
-    <multi_esc>false</multi_esc>
-
-    <!-- Cruise control: hold current speed when throttle held at position -->
-    <cruise_control>false</cruise_control>
-
-    <!-- Smart reverse: hold brake to enable slow reverse -->
-    <smart_rev_treat_as_brake>true</smart_rev_treat_as_brake>
-  </app_adc_conf>
-
-  <!-- =====================================================================
-       UART Timeout
-       If VESC doesn't receive a packet for this many ms, it will stop the
-       motor. ESP32 sends COMM_ALIVE heartbeat to prevent this.
-       ===================================================================== -->
-  <!-- Timeout in ms (0 = disabled). 500 ms is safe — ESP32 sends alive every 200 ms. -->
-  <timeout_msec>500</timeout_msec>
-  <timeout_brake_current>5.0</timeout_brake_current>
-
-  <!-- =====================================================================
-       CAN Settings (not used in this build, single VESC)
-       ===================================================================== -->
-  <can_baud_rate>3</can_baud_rate><!-- 500 kbit -->
-  <can_status_rate>500</can_status_rate>
-  <controller_id>0</controller_id>
-
-  <!-- =====================================================================
-       General Settings
-       ===================================================================== -->
-  <!-- Shutdown mode: 0=off when no comm, 2=always on -->
-  <shutdown_mode>0</shutdown_mode>
-
-  <!-- IMU settings: not used (IMU is on ESP32-S3 via QMI8658) -->
-  <imu_conf>
-    <type>0</type><!-- 0=Disabled -->
-  </imu_conf>
-
+     <controller_id>48</controller_id>
+     <can_baud_rate>2</can_baud_rate>
+     <permanent_uart_enabled>1</permanent_uart_enabled>
+     <shutdown_mode>7</shutdown_mode>
+     <can_mode>0</can_mode>
+     <app_to_use>3</app_to_use>
+     <app_uart_baudrate>115200</app_uart_baudrate>
+     <timeout_msec>1000</timeout_msec>
+     <timeout_brake_current>0.0</timeout_brake_current>
 </APPConfiguration>
