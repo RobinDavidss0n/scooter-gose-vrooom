@@ -1,83 +1,62 @@
-# VESC Configuration
+# VESC Starter
 
-## Prerequisites
+The repo now keeps two different things:
 
-1. Download **VESC Tool** (free, open source): https://vesc-project.com/vesc_tool
-2. Connect VESC MINI 6.7 to your PC via USB-C
-3. Click **Connect** in VESC Tool
+- `config/vesc_mcconf.xml` and `config/vesc_appconf.xml` are full exports from a working controller. Keep them as backups.
+- `config/motor_config_xiaomi_elite_ne.xml` and `config/app_config.xml` are small reusable overlays. They are meant for a new motor on the same scooter platform after detection has already been run.
 
----
+VESC Tool applies only the tags present in a partial XML file.
 
-## Step 1 — Motor Detection (Required!)
+## Which workflow to use
 
-> The XML configs in this directory contain *target limits* but **not** the motor-specific
-> parameters (R, L, flux linkage). You must run motor detection first.
+If you are restoring the same known-good setup:
 
-1. **Motor Settings → FOC → Motor Setup Wizard**
-2. Select **Inrunner / Outrunner / Hub motor**
-3. Run **Resistance & Inductance Detection** — motor must be free to spin
-4. Run **Flux Linkage Detection** (spins motor briefly)
-5. Run **Hall Sensor Detection** (if Hall sensors are wired)
-6. Write configuration
+1. Read the live config from the VESC.
+2. Load `config/vesc_mcconf.xml`.
+3. Load `config/vesc_appconf.xml`.
+4. Write both configs.
 
----
+If you are fitting a new motor:
 
-## Step 2 — Import the Limit Config
+1. Read the live config from the VESC.
+2. Run the FOC wizard.
+3. Run hall detection if hall sensors are connected.
+4. Verify direction and that the wheel spins cleanly.
+5. Load `config/motor_config_xiaomi_elite_ne.xml`.
+6. Load `config/app_config.xml` if you want the same UART and timeout behavior.
+7. Write the configs and test with the wheel off the ground.
 
-1. **Motor Settings → Import XML** → select `motor_config_xiaomi_elite_ne.xml`
-2. Review the values (especially current limits) — adjust if needed
-3. **Write Motor Configuration**
+## What should be entered in the wizard
 
-## Step 3 — Import the App Config
+These are the scooter-level values that make sense to keep when the motor changes:
 
-1. **App Settings → Import XML** → select `app_config.xml`
-2. **Write App Configuration**
+- Motor control: FOC.
+- Sensor mode: Hall sensors, if the motor has them wired.
+- Motor poles: 30.
+- Gear ratio: 1.0.
+- Wheel diameter: 0.254 m.
+- Battery type: Li-ion.
+- Battery cells: 10.
+- Battery capacity: 10 Ah.
+- Motor no-load current: 1 A.
 
----
+## What should not be reused on a different motor
 
-## Step 4 — Test & Calibrate
+Do not carry these values over from one motor to another without rerunning detection:
 
-1. **RT Data** tab → watch live values while manually spinning the wheel
-2. Verify **ERPM** increases when wheel spins forward
-3. Verify **Hall sensors** show clean transitions (no missed steps)
-4. Throttle: if using ADC throttle, go to **App Settings → ADC** and calibrate min/max voltage
+- `foc_motor_r`
+- `foc_motor_l`
+- `foc_motor_ld_lq_diff`
+- `foc_motor_flux_linkage`
+- `foc_current_kp`
+- `foc_current_ki`
+- `foc_observer_gain`
+- `foc_hall_table__*`
+- `foc_offsets_*`
 
----
+Those values are exactly why the wizard exists.
 
-## Key Parameters Explained
+## What the small files keep
 
-### Motor Current vs Battery Current
-
-- **Motor current** (`l_current_max`): peak current through motor windings. Can be higher than battery current briefly.
-- **Battery current** (`l_in_current_max`): sustained current drawn from battery. Should match your fuse rating.
-
-### ERPM vs Speed
-
-```
-speed_kmh = (erpm / pole_pairs) * (wheel_circumference_m * π) * 60 / 1000
-```
-
-For Xiaomi Elite NE (8.5″ wheel, 15 pole pairs):
-- 30 km/h ≈ 11,000 ERPM
-- 25 km/h ≈ 9,200 ERPM
-
-Set `l_max_erpm` to match your desired speed limit.
-
-### Riding Modes (set from ESP32)
-
-The ESP32 switches modes by sending `COMM_SET_CURRENT` with different limits:
-
-| Mode | Motor A | Battery A | Max ERPM |
-|---|---|---|---|
-| ECO | 8 A | 6 A | 7,000 |
-| SPORT | 20 A | 15 A | 11,000 |
-| TURBO | 30 A | 20 A | 13,000 |
-
-> Note: Mode limits are enforced in software on the ESP32 side. VESC hardware limits are the absolute ceiling.
-
----
-
-## VESC Tool App (Mobile)
-
-VESC Tool is available as a mobile app (Android) — you can connect directly via BLE
-if your VESC has a BLE module, or you can use the ESP32 as a bridge (future feature).
+- `motor_config_xiaomi_elite_ne.xml`: current limits, battery cutoff, temperature limits, and wheel or battery metadata.
+- `app_config.xml`: the minimum controller-side app settings that are independent of the motor, such as UART mode, baud rate, controller ID, and timeout behavior.
