@@ -17,7 +17,7 @@ Setup the ESC using the [VESC tool](https://vesc-project.com/vesc_tool).
       - *Regen:* **-8 A** (0.8 C)
       - *Current max:*<br>
 				**20 A** (safe value, roughly 720 W at 36V)<br>
-				**25 A** (overdrive value, roughly 900 W at 36V, **requires BMS bypass as OG limits to ~21 A**)<br>
+				**25 A** (overdrive value, roughly 900 W at 36V, **probably needs BMS bypass as OG BMS probably somewhere over 20 A**)<br>
 				The battery theoretical max is around 30 A but introduces extreme degradation.
 1. Setup:
    - *Direct drive:* **checked**
@@ -32,7 +32,7 @@ Setup the ESC using the [VESC tool](https://vesc-project.com/vesc_tool).
 
 ##### Current
 - *Motor current max:* **37.5 A** <br>
-Speed is proportional to voltage, so at lower speed the motor needs more current to keep the same wattage, over 40 A would probably damage the motor long term and mostly generate more heat.
+Speed is proportional to voltage, so at lower speed the motor needs more current to keep the same wattage, over 40 A would probably damage the motor long term and mostly generates more heat.
 - *Motor current max brake:* **-35 A**
 - *Absolute maximum current:* **50 A** (For sudden spikes, if current goes over this threshold the VESC triggers an immediate emergency shutdown)
 - *Battery current max:*<br>
@@ -45,19 +45,22 @@ Speed is proportional to voltage, so at lower speed the motor needs more current
 - *Battery voltage cutoff start:* **34 V** (when the battery voltage drops below this threshold, the VESC starts to limit the power to prevent over-discharging the battery)
 - *Battery voltage cutoff end:* (when the battery voltage drops below this threshold, the VESC will completely cut off the power to protect the battery)<br>
 	**32 V** (less battery degradation)<br>
-	**31 V** (value under this will cause permanent damage)
+	**30-31 V** (values under this will cause permanent damage)
 - *Battery voltage regen cutoff start:* **40.5 V** (start to limit regen when the battery voltage start reaching this threshold)
 - *Battery voltage regen cutoff end:* **41 V** (cut off regen when the battery voltage start reaching this threshold, prevents overcharging the battery)
 
 #### Temperature
 - *Motor temp cutoff start:* **80°C** (start limiting current when the motor temperature reaches this threshold)
-- *Motor temp cutoff end:* **100°C** (completely cut off current when the motor temperature reaches this threshold)
+- *Motor temp cutoff end:* **95°C** (completely cut off current when the motor temperature reaches this threshold)
 
 #### BMS
-- *BMS type:* **None** (VESC do not communicate with the BMS)
+- *BMS type:* **None** (VESC do not communicate with the BMS as its cant communicate with the OG BMS)
 
 #### Advanced
-- Duty cycle current limit start: **90%** (smooths out the cutoff of power at top speed to prevent jerking)
+- Maximum duty cycle: **95%** (gives the VESC some headroom voltage to use when at full power, as VESC use voltage over the current speed voltage as well for fine adjustments)
+- Duty cycle current limit start: (This is calculated as a percentage of the set *Maximum duty cycle*)<br>
+	**95%** = balanced, a bit less conservative (90.25% of 100% duty cycle)<br>
+	**90%** = smoother and more conservative (85.5% of 100% duty cycle)<br>
 
 
 ## Enabling Field Weakening
@@ -75,12 +78,24 @@ Enable these settings for field weakening to work properly:
 
 ### Motor settings -> FOC
 #### Field weakening
-- *Field weakening current max:* **10 A** (Good starting point, can be increased if the motor can handle the extra heat)
+- *Field weakening current max:*<br>
+   **3-5 A** (recommended starting range for test runs)<br>
+   **5-8 A** (aggressive range)<br>
+   **10 A** (brief experimental only, watch motor temperature closely)
 - *Field weakening duty start:* **85%** (when the field weakening starts to take effect)
 - *Field weakening ramp time:* **500 ms** (ramp time for the field weakening to reach its maximum effect)
 
 ### Motor settings -> General
 
-#### RPM
-- *Max ERPM:* **12 600** (results in 40.2 km/h)
+#### RPM 
 - *ERPM limit start:* **95%** (when the motor reaches 95% of the max ERPM, the VESC starts to limit the power to prevent a hard cutoff of power at top speed)
+- *Suggested profiles:*<br>
+   **12 600 ERPM** = **40.2 km/h** hard cap, starts tapering at **38.2 km/h**<br>
+   **13 200 ERPM** = **42.1 km/h** hard cap, starts tapering at **40.0 km/h**<br>
+   **14 100 ERPM** = **45.0 km/h** test profile, starts tapering at **42.8 km/h**<br>
+   **15 700 ERPM** = **50.1 km/h** experimental only, starts tapering at **47.6 km/h**
+- *Low-voltage note:* At around **36 V**, reaching **40 km/h** already needs field weakening.
+- *Power-loss risk with field weakening:* If the VESC loses power/control above base speed, the motor can feed back roughly its natural back-EMF into the ESC and potentially overvoltage/damage it.<br>
+   **45 km/h** -> **~47 V**<br>
+   **50 km/h** -> **~52 V**<br>
+   **55 km/h** -> **~57.5 V** (little margin left on a **60 V** ESC)
