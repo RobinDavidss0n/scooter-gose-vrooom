@@ -58,7 +58,9 @@ Speed is proportional to voltage, so at lower speed the motor needs more current
 
 #### Advanced
 - Maximum duty cycle: **95%** (gives the VESC some headroom voltage to use when at full power, as VESC use voltage over the current speed voltage as well for fine adjustments)
-- Duty cycle current limit start: (This is calculated as a percentage of the set *Maximum duty cycle*)<br>
+- Duty cycle current limit start: (softly ramp down current at the set duty cycle value, this is calculated as a percentage of the set *Maximum duty cycle*)<br>
+   ⚠️ NOTE: When this is not at 100%, the motor might behave badly when *Field weakening* is used<br>
+   **100%** = disabled, try this first and see if it rides smooth at top speed, if not try the next values<br>  
 	**95%** = balanced, a bit less conservative (90.25% of 100% duty cycle)<br>
 	**90%** = smoother and more conservative (85.5% of 100% duty cycle)<br>
 
@@ -66,12 +68,13 @@ Speed is proportional to voltage, so at lower speed the motor needs more current
 ## Enabling Field Weakening
 
 Field weakening works by injecting a extra current in the d-axis to weaken the magnetic field of the motor, allowing it to spin faster than its natural speed. This current do not give any extra torque, it will only generate extra heat so it drastically reduce efficiency.
+⚠️ NOTE: This setting might behave badly with *Duty cycle current limit start*<br>
 
 **⚠️ DANGER ⚠️**
 
 
 **Enabling field weakening poses several risks to both the motor and the rider:**
-- *Rider safety:* If the VESC in someway stop working while the scooter is at high speed using the field weakening, the VESC will stop supplying current to keep the field weakening active and will cause the scooter to break hard as the field is no longer weakened. Or in worst case a short in the motor phases, that would causes an immediate wheel lockup. Having the motor in the back wheel neglect the risk of catastrophic falls somewhat. Using this setting on a front wheel would be extremely dangerous and is not recommended.
+- *Rider safety:* If the VESC in someway stop working while the scooter is at high speed using the field weakening, the VESC will stop supplying current to keep the field weakening active and can cause strong drag, regen, or abrupt deceleration depending on the fault mode, as the field is no longer weakened. Or in worst case a short in the motor phases, that would causes an immediate wheel lockup. Having the motor in the back wheel neglect the risk of catastrophic falls somewhat. Using this setting on a front wheel would be extremely dangerous and is not recommended.
 - *Motor Damage:* The extra heat may damage the motor, this should only be used with motors that have a temperature sensor so one can set a temperature limit to prevent overheating.
 
 Enable these settings for field weakening to work properly:
