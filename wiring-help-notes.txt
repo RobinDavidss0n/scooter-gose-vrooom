@@ -1,0 +1,3 @@
+MCU									VESC
+TX 18 (BLUE)  <---> RX POS 4 (GREEN)
+RX 17 (GREEN) <---> TX POS 3 (BLUE)

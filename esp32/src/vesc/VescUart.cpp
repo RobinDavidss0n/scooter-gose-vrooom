@@ -3,6 +3,11 @@
 #include <math.h>
 #include <string.h>
 
+// Uncomment to enable human-readable VESC UART diagnostics (throttled output)
+#define VESC_UART_DEBUG
+// Print one summary line every N successfully decoded telemetry frames
+static constexpr uint32_t kDebugPrintInterval = 20;
+
 namespace scooter {
 
 namespace {
@@ -28,6 +33,9 @@ void VescUart::poll(uint32_t nowMs) {
         }
 
         if (_rxLength >= kRxBufferSize) {
+#ifdef VESC_UART_DEBUG
+            Serial.println("[VESC] RX buffer full — discarding oldest byte");
+#endif
             discardPrefix(1);
         }
 
@@ -99,11 +107,17 @@ void VescUart::processFrames(uint32_t nowMs) {
             payloadLength = (static_cast<size_t>(_rxBuffer[1]) << 8) | _rxBuffer[2];
             frameLength = headerLength + payloadLength + 3;
         } else {
+#ifdef VESC_UART_DEBUG
+            Serial.printf("[VESC] Bad start byte 0x%02X — discarding\n", start);
+#endif
             discardPrefix(1);
             continue;
         }
 
         if (frameLength > kRxBufferSize) {
+#ifdef VESC_UART_DEBUG
+            Serial.printf("[VESC] Frame too large (%u) — discarding\n", (unsigned)frameLength);
+#endif
             discardPrefix(1);
             continue;
         }
@@ -113,6 +127,10 @@ void VescUart::processFrames(uint32_t nowMs) {
         }
 
         if (_rxBuffer[frameLength - 1] != kFrameStop) {
+#ifdef VESC_UART_DEBUG
+            Serial.printf("[VESC] Bad stop byte 0x%02X — discarding\n",
+                          _rxBuffer[frameLength - 1]);
+#endif
             discardPrefix(1);
             continue;
         }
@@ -122,6 +140,10 @@ void VescUart::processFrames(uint32_t nowMs) {
                                      static_cast<uint16_t>(_rxBuffer[crcIndex + 1]);
         const uint16_t actualCrc = crc16(&_rxBuffer[headerLength], payloadLength);
         if (expectedCrc != actualCrc) {
+#ifdef VESC_UART_DEBUG
+            Serial.printf("[VESC] CRC MISMATCH: expected=0x%04X actual=0x%04X — discarding\n",
+                          expectedCrc, actualCrc);
+#endif
             discardPrefix(1);
             continue;
         }
@@ -154,12 +176,27 @@ void VescUart::handlePayload(const uint8_t *payload, size_t length, uint32_t now
 
     VescTelemetry decoded;
     if (!decodeGetValues(payload, length, decoded)) {
+#ifdef VESC_UART_DEBUG
+        Serial.printf("[VESC] decodeGetValues failed (payload %u bytes, need >=59)\n",
+                      (unsigned)length);
+#endif
         return;
     }
 
     decoded.valid = true;
     decoded.lastResponseMs = nowMs;
     _telemetry = decoded;
+
+#ifdef VESC_UART_DEBUG
+    static uint32_t debugCount = 0;
+    if (++debugCount % kDebugPrintInterval == 0) {
+        Serial.printf("[VESC] #%lu  RPM=%ld  Vin=%.1fV  motorA=%.2f  inputA=%.2f  fault=%u\n",
+                      (unsigned long)debugCount,
+                      (long)decoded.rpm, decoded.inputVoltageV,
+                      decoded.motorCurrentA, decoded.inputCurrentA,
+                      decoded.faultCode);
+    }
+#endif
 }
 
 bool VescUart::decodeGetValues(const uint8_t *payload, size_t length, VescTelemetry &out) const {
