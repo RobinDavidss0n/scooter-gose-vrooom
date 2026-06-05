@@ -8,6 +8,9 @@
 #include "control/CurrentController.h"
 #include "vesc/VescUart.h"
 
+// Uncomment to enable human-readable UI diagnostics.
+// #define UI_DEBUG
+
 // --- Correct 1.28" Microcontroller Hardware Pin Map ---
 #define LCD_BL_PIN   2   // Direct MCU pin for Backlight PWM control
 #define LCD_RST_PIN 14   // Direct MCU pin for Display Hardware Reset
@@ -16,10 +19,16 @@ constexpr int VESC_UART_RX_PIN = 17;
 constexpr int VESC_UART_TX_PIN = 18;
 constexpr uint32_t VESC_UART_BAUD = 115200;
 
-constexpr uint32_t CONTROL_INTERVAL_MS = 10;
+constexpr uint32_t CONTROL_INTERVAL_MS   = 10;
 constexpr uint32_t TELEMETRY_INTERVAL_MS = 100;
-constexpr uint32_t ALIVE_INTERVAL_MS = 200;
-constexpr uint32_t UI_INTERVAL_MS = 100;
+constexpr uint32_t ALIVE_INTERVAL_MS     = 200;
+constexpr uint32_t UI_INTERVAL_MS        = 100;
+
+// RPM-to-km/h conversion factor.
+// Formula: (wheel_circumference_m * 60) / (motor_pole_pairs * 1000)
+// Example: 6" wheel (0.479 m) + 20-pole motor (10 pairs) => ~0.00287
+// Calibrate against a known speed source before trusting the display.
+constexpr float kRpmToKmhFactor = 0.00287f;
 
 // 1. Build the explicit Hardware Driver wrapper for the 1.28" Board Layout
 class LGFX_Waveshare_128 : public lgfx::LGFX_Device 
@@ -46,6 +55,7 @@ public:
             cfg.pin_cs         = 9;   
             cfg.pin_rst        = LCD_RST_PIN; // Give LovyanGFX control of the hardware reset pin
 
+            cfg.invert         = true; // This panel's light/dark polarity is inverted by default.
             cfg.rgb_order      = true;
 
             _panel_instance.config(cfg);
@@ -66,10 +76,10 @@ uint32_t lastControlTickMs = 0;
 uint32_t lastTelemetryRequestMs = 0;
 uint32_t lastAliveMs = 0;
 uint32_t lastUiTickMs = 0;
+uint32_t lastLvglTickMs = 0;
 
-lv_obj_t *title_label = nullptr;
-lv_obj_t *status_label = nullptr;
-lv_obj_t *hint_label = nullptr;
+static lv_obj_t *ui_screen = nullptr;
+static lv_obj_t *speed_label = nullptr;
 
 char consoleLineBuffer[96] = {0};
 size_t consoleLineLength = 0;
@@ -327,52 +337,65 @@ void poll_console()
     }
 }
 
-void setup_dashboard()
+// ---------------------------------------------------------------------------
+// UI — speedometer
+// ---------------------------------------------------------------------------
+
+void setup_ui()
 {
-    title_label = lv_label_create(lv_scr_act());
-    lv_label_set_text(title_label, "VESC Current Mode");
-    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 10);
+    #ifdef UI_DEBUG
+    Serial.println("[UI] setup_ui");
+    #endif
 
-    status_label = lv_label_create(lv_scr_act());
-    lv_obj_set_width(status_label, 220);
-    lv_label_set_long_mode(status_label, LV_LABEL_LONG_WRAP);
-    lv_label_set_text(status_label, "Booting...");
-    lv_obj_align(status_label, LV_ALIGN_CENTER, 0, 46);
+    ui_screen = lv_obj_create(nullptr);
+    lv_obj_remove_style_all(ui_screen);
+    lv_obj_set_style_bg_color(ui_screen, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(ui_screen, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(ui_screen, 0, 0);
+    lv_obj_clear_flag(ui_screen, LV_OBJ_FLAG_SCROLLABLE);
+    lv_scr_load(ui_screen);
 
-    hint_label = lv_label_create(lv_scr_act());
-    lv_obj_set_width(hint_label, 220);
-    lv_label_set_long_mode(hint_label, LV_LABEL_LONG_WRAP);
-    lv_label_set_text(hint_label, "USB: help | enable 1 | throttle 0.10");
-    lv_obj_align(hint_label, LV_ALIGN_BOTTOM_MID, 0, -8);
+    speed_label = lv_label_create(ui_screen);
+    lv_obj_set_width(speed_label, 180);  // Stay inside the round display
+    lv_label_set_long_mode(speed_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_align(speed_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(speed_label, lv_color_white(), 0);
+    lv_label_set_text(speed_label, "...");
+    lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, 0);
 
-    setup_headlight_icon();
-    setup_left_blinker_icon();
-    setup_right_blinker_icon();
+    // setup_headlight_icon();
+    // setup_left_blinker_icon();
+    // setup_right_blinker_icon();
 }
 
-void update_dashboard(uint32_t nowMs)
+void update_ui(uint32_t nowMs)
 {
-    if (status_label == nullptr) {
+    if (speed_label == nullptr) {
         return;
     }
 
-    const scooter::VescTelemetry &telemetry = vesc.telemetry();
-    char statusText[320] = {0};
-    snprintf(statusText,
-             sizeof(statusText),
-             "Link: %s  Telemetry: %s\nRPM: %ld  Vin: %.1f V\nMotor: %.2f A  Input: %.2f A\nCmd drive: %.2f A  brake: %.2f A\nThrottle: %.2f  Brake: %.2f  Fault: %u",
-             vesc.isConnected(nowMs) ? "ONLINE" : "OFFLINE",
-             vesc.hasFreshTelemetry(nowMs) ? "FRESH" : "STALE",
-             static_cast<long>(telemetry.rpm),
-             telemetry.inputVoltageV,
-             telemetry.motorCurrentA,
-             telemetry.inputCurrentA,
-             controlOutput.driveCurrentA,
-             controlOutput.brakeCurrentA,
-             controlInputs.throttle,
-             controlInputs.brake,
-             telemetry.faultCode);
-    lv_label_set_text(status_label, statusText);
+    if (!vesc.isConnected(nowMs)) {
+        if (strcmp(lv_label_get_text(speed_label), "OFFLINE") != 0) {
+            #ifdef UI_DEBUG
+            Serial.println("[UI] state -> OFFLINE");
+            #endif
+            lv_label_set_text(speed_label, "OFFLINE");
+        }
+        lv_obj_invalidate(speed_label);
+        return;
+    }
+
+    const float kmh = fabsf(static_cast<float>(vesc.telemetry().rpm) * kRpmToKmhFactor);
+    char text[16];
+    snprintf(text, sizeof(text), "%d\nkm/h", static_cast<int>(kmh));
+    if (strcmp(lv_label_get_text(speed_label), text) != 0) {
+        #ifdef UI_DEBUG
+        Serial.printf("[UI] state -> %s\n", text);
+        #endif
+        lv_label_set_text(speed_label, text);
+    }
+    lv_obj_invalidate(speed_label);
 }
 
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
@@ -395,8 +418,10 @@ void setup()
     digitalWrite(LCD_BL_PIN, HIGH); 
 
     lcd.init();
-    
+    lcd.fillScreen(0x0000);  // Physically clear to black before LVGL takes over
+
     lv_init();
+    lastLvglTickMs = millis();
     lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * 10);
 
     static lv_disp_drv_t disp_drv;
@@ -407,7 +432,7 @@ void setup()
     disp_drv.draw_buf = &draw_buf;
     lv_disp_drv_register(&disp_drv);
 
-    setup_dashboard();
+    setup_ui();
 
     controlInputs.enabled = false;
     controlInputs.throttle = 0.0f;
@@ -435,6 +460,11 @@ void setup()
 void loop()
 {
     const uint32_t nowMs = millis();
+    const uint32_t lvglElapsedMs = nowMs - lastLvglTickMs;
+    if (lvglElapsedMs > 0) {
+        lv_tick_inc(lvglElapsedMs);
+        lastLvglTickMs = nowMs;
+    }
 
     poll_console();
     vesc.poll(nowMs);
@@ -461,7 +491,7 @@ void loop()
 
     if (nowMs - lastUiTickMs >= UI_INTERVAL_MS) {
         lastUiTickMs = nowMs;
-        update_dashboard(nowMs);
+        update_ui(nowMs);
     }
 
     lv_timer_handler();
