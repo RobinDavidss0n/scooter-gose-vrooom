@@ -19,6 +19,12 @@ constexpr int VESC_UART_RX_PIN = 17;
 constexpr int VESC_UART_TX_PIN = 18;
 constexpr uint32_t VESC_UART_BAUD = 115200;
 
+constexpr int THROTTLE_ADC_PIN = 16;
+constexpr uint32_t THROTTLE_LOG_INTERVAL_MS = 100;
+constexpr uint16_t THROTTLE_IDLE_MV = 850; // Idle throttle gives around 0.8v
+constexpr uint16_t THROTTLE_FULL_MV = 2550; // Full throttle gives around 2.8v
+constexpr uint16_t THROTTLE_IDLE_DEADZONE_MV = 40;
+
 constexpr uint32_t CONTROL_INTERVAL_MS   = 10;
 constexpr uint32_t TELEMETRY_INTERVAL_MS = 100;
 constexpr uint32_t ALIVE_INTERVAL_MS     = 200;
@@ -77,6 +83,13 @@ uint32_t lastTelemetryRequestMs = 0;
 uint32_t lastAliveMs = 0;
 uint32_t lastUiTickMs = 0;
 uint32_t lastLvglTickMs = 0;
+uint32_t lastThrottleLogMs = 0;
+
+int throttleRawAdc = 0;
+uint16_t throttleMillivolts = 0;
+float throttleNormalized = 0.0f;
+
+bool throttleLogEnabled = false;
 
 static lv_obj_t *ui_screen = nullptr;
 static lv_obj_t *speed_label = nullptr;
@@ -145,6 +158,49 @@ static float clamp01(float value)
     return value;
 }
 
+float normalize_throttle_mv(uint16_t millivolts)
+{
+    const float startMv = static_cast<float>(THROTTLE_IDLE_MV + THROTTLE_IDLE_DEADZONE_MV);
+    const float endMv = static_cast<float>(THROTTLE_FULL_MV);
+    if (endMv <= startMv) {
+        return 0.0f;
+    }
+
+    const float normalized =
+        (static_cast<float>(millivolts) - startMv) / (endMv - startMv);
+    return clamp01(normalized);
+}
+
+void read_physical_throttle()
+{
+    throttleRawAdc = analogRead(THROTTLE_ADC_PIN);
+    throttleMillivolts = static_cast<uint16_t>(analogReadMilliVolts(THROTTLE_ADC_PIN));
+    throttleNormalized = normalize_throttle_mv(throttleMillivolts);
+
+    if (controlInputs.enabled) {
+        controlInputs.throttle = throttleNormalized;
+        controlInputs.brake = 0.0f;
+    }
+}
+
+void log_physical_throttle(uint32_t nowMs)
+{
+    if (!throttleLogEnabled) {
+        return;
+    }
+
+    if (nowMs - lastThrottleLogMs < THROTTLE_LOG_INTERVAL_MS) {
+        return;
+    }
+
+    lastThrottleLogMs = nowMs;
+    Serial.printf("throttle adc=%d mv=%u norm=%.3f enabled=%d\n",
+                  throttleRawAdc,
+                  static_cast<unsigned>(throttleMillivolts),
+                  throttleNormalized,
+                  controlInputs.enabled);
+}
+
 void print_console_help()
 {
     Serial.println();
@@ -153,6 +209,7 @@ void print_console_help()
     Serial.println(F("  status"));
     Serial.println(F("  enable 0|1"));
     Serial.println(F("  throttle <0.0..1.0>"));
+    Serial.println(F("  throttle_log 0|1"));
     Serial.println(F("  brake <0.0..1.0>"));
     Serial.println(F("  stop"));
     Serial.println(F("  profile drive <amps>"));
@@ -239,6 +296,18 @@ void process_console_command(char *line)
         controlInputs.throttle = clamp01(static_cast<float>(atof(value)));
         controlInputs.brake = 0.0f;
         Serial.printf("Throttle set to %.2f.\n", controlInputs.throttle);
+        return;
+    }
+
+    if (strcmp(command, "throttle_log") == 0) {
+        char *value = strtok_r(nullptr, " \t", &save);
+        if (value == nullptr) {
+            Serial.println(F("Usage: throttle_log 0|1"));
+            return;
+        }
+
+        throttleLogEnabled = atoi(value) != 0;
+        Serial.printf("Throttle logging %s.\n", throttleLogEnabled ? "enabled" : "disabled");
         return;
     }
 
@@ -417,6 +486,10 @@ void setup()
     pinMode(LCD_BL_PIN, OUTPUT);
     digitalWrite(LCD_BL_PIN, HIGH); 
 
+    pinMode(THROTTLE_ADC_PIN, INPUT);
+    analogReadResolution(12);
+    analogSetPinAttenuation(THROTTLE_ADC_PIN, ADC_11db);
+
     lcd.init();
     lcd.fillScreen(0x0000);  // Physically clear to black before LVGL takes over
 
@@ -453,6 +526,10 @@ void setup()
                   VESC_UART_RX_PIN,
                   VESC_UART_TX_PIN,
                   static_cast<unsigned long>(VESC_UART_BAUD));
+    Serial.printf("Throttle ADC on GPIO=%d idle=%u mV full=%u mV\n",
+                  THROTTLE_ADC_PIN,
+                  static_cast<unsigned>(THROTTLE_IDLE_MV),
+                  static_cast<unsigned>(THROTTLE_FULL_MV));
     
     Serial.println("Done with setup.");
 }
@@ -467,6 +544,8 @@ void loop()
     }
 
     poll_console();
+    read_physical_throttle();
+    log_physical_throttle(nowMs);
     vesc.poll(nowMs);
 
     if (nowMs - lastControlTickMs >= CONTROL_INTERVAL_MS) {
