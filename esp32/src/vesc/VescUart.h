@@ -23,6 +23,9 @@ public:
     // --- State ---
     bool isConnected(uint32_t nowMs, uint32_t timeoutMs = 1000) const;
     bool hasFreshTelemetry(uint32_t nowMs, uint32_t maxAgeMs = 500) const;
+    // Returns true if a frame error (bad start/stop byte, CRC mismatch, oversize
+    // frame) occurred within the last windowMs milliseconds.
+    bool hasRecentRxError(uint32_t nowMs, uint32_t windowMs = 1000) const;
 
     const VescTelemetry &telemetry() const { return _telemetry; }
     uint32_t             lastRxMs()  const { return _lastRxMs;  }
@@ -40,8 +43,9 @@ private:
     size_t  _rxLength                = 0;
 
     VescTelemetry _telemetry;
-    uint32_t      _lastRxMs = 0;
-    uint32_t      _lastTxMs = 0;
+    uint32_t      _lastRxMs      = 0;
+    uint32_t      _lastTxMs      = 0;
+    uint32_t      _lastRxErrorMs = 0;  // timestamp of the most recent frame error
 
     // --- RX processing ---
     void processFrames(uint32_t nowMs);

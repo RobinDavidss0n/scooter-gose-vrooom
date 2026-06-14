@@ -97,6 +97,10 @@ bool VescUart::hasFreshTelemetry(uint32_t nowMs, uint32_t maxAgeMs) const {
     return _telemetry.valid && (nowMs - _telemetry.lastResponseMs) <= maxAgeMs;
 }
 
+bool VescUart::hasRecentRxError(uint32_t nowMs, uint32_t windowMs) const {
+    return _lastRxErrorMs != 0 && (nowMs - _lastRxErrorMs) <= windowMs;
+}
+
 // ---------------------------------------------------------------------------
 // RX: frame parsing
 // ---------------------------------------------------------------------------
@@ -124,6 +128,7 @@ void VescUart::processFrames(uint32_t nowMs) {
             #ifdef VESC_UART_DEBUG
             Serial.printf("[VESC] Bad start byte 0x%02X — discarding\n", start);
             #endif
+            _lastRxErrorMs = nowMs;
             discardPrefix(1);
             continue;
         }
@@ -134,6 +139,7 @@ void VescUart::processFrames(uint32_t nowMs) {
             #ifdef VESC_UART_DEBUG
             Serial.printf("[VESC] Frame too large (%u) — discarding\n", (unsigned)frameLength);
             #endif
+            _lastRxErrorMs = nowMs;
             discardPrefix(1);
             continue;
         }
@@ -147,6 +153,7 @@ void VescUart::processFrames(uint32_t nowMs) {
             Serial.printf("[VESC] Bad stop byte 0x%02X — discarding\n",
                           _rxBuffer[frameLength - 1]);
             #endif
+            _lastRxErrorMs = nowMs;
             discardPrefix(1);
             continue;
         }
@@ -161,6 +168,7 @@ void VescUart::processFrames(uint32_t nowMs) {
             Serial.printf("[VESC] CRC mismatch: expected=0x%04X actual=0x%04X — discarding\n",
                           expectedCrc, actualCrc);
             #endif
+            _lastRxErrorMs = nowMs;
             discardPrefix(1);
             continue;
         }
@@ -197,6 +205,7 @@ void VescUart::handlePayload(const uint8_t *payload, size_t length, uint32_t now
         Serial.printf("[VESC] decodeGetValues failed (%u bytes, need >=58)\n",
                       (unsigned)length);
         #endif
+        _lastRxErrorMs = nowMs;
         return;
     }
 
