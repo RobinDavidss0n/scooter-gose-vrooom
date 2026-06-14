@@ -2,6 +2,8 @@
 
 #include <math.h>
 
+#include "config.h"
+
 namespace scooter {
 
 CurrentControlOutput CurrentController::update(const CurrentControlInputs &inputs,
@@ -96,11 +98,14 @@ float CurrentController::computeSpeedScale(const CurrentControlProfile &profile,
 
     const float span = profile.speedLimitRpm - profile.speedTaperStartRpm;
     if (span <= 0.0f) {
-        return 0.0f;
+        return CONTROL_SPEED_SCALE_FLOOR;
     }
 
-    const float remaining = profile.speedLimitRpm - rpm;
-    return remaining / span;
+    const float raw = (profile.speedLimitRpm - rpm) / span;  // 1.0 → 0.0 across the band
+    // Apply a floor so drive current never fully cuts off at the limit.
+    // This prevents bang-bang oscillation on a bench (no road load) and
+    // gives a stable equilibrium on the road.
+    return CONTROL_SPEED_SCALE_FLOOR + (1.0f - CONTROL_SPEED_SCALE_FLOOR) * raw;
 }
 
 }  // namespace scooter

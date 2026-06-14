@@ -20,8 +20,8 @@ constexpr uint32_t VESC_UART_BAUD    = 115200;
 // ---------------------------------------------------------------------------
 constexpr int      THROTTLE_ADC_PIN          = 16;
 constexpr uint32_t THROTTLE_LOG_INTERVAL_MS  = 500;
-constexpr uint16_t THROTTLE_IDLE_MV          = 850;   // ~0.85 V at idle
-constexpr uint16_t THROTTLE_FULL_MV          = 2550;  // ~2.55 V at full
+constexpr uint16_t THROTTLE_IDLE_MV          = 850;  // The actual throttle hardware gives around 0.8v at idle
+constexpr uint16_t THROTTLE_FULL_MV          = 2550; // The actual throttle hardware gives around 2.8v at full
 constexpr uint16_t THROTTLE_IDLE_DEADZONE_MV = 40;
 
 // ---------------------------------------------------------------------------
@@ -42,13 +42,20 @@ constexpr float kRpmToKmhFactor = 0.003192f;
 
 // ---------------------------------------------------------------------------
 // Control profile defaults
-// ---------------------------------------------------------------------------
+// -----------------------------------------------------------constexpr float CONTROL_SPEED_LIMIT_KMH         = 30.0f;
+// Taper begins at this fraction of the limit (60 %), giving a wide band to se----------------
 constexpr float CONTROL_INITIAL_DRIVE_CURRENT_A = 6.0f;
 constexpr float CONTROL_INITIAL_BRAKE_CURRENT_A = 4.0f;
-constexpr float CONTROL_SPEED_TAPER_START_KMH   = 16.0f;
-constexpr float CONTROL_SPEED_LIMIT_KMH         = 60.0f;
-constexpr float CONTROL_DRIVE_RAMP_RATE_APS     = 25.0f;
-constexpr float CONTROL_BRAKE_RAMP_RATE_APS     = 35.0f;
+constexpr float CONTROL_SPEED_LIMIT_KMH         = 30.0f;
+// Taper begins at this fraction of the limit (60 %), giving a wide band to settle in.
+// Adjust kTaperRatio if you want a shorter or longer ramp.
+constexpr float CONTROL_SPEED_TAPER_RATIO       = 0.60f;
+constexpr float CONTROL_SPEED_TAPER_START_KMH   = CONTROL_SPEED_LIMIT_KMH * CONTROL_SPEED_TAPER_RATIO;
+constexpr float CONTROL_DRIVE_RAMP_RATE_APS     = 25.0f; //TODO control what this value should be
+constexpr float CONTROL_BRAKE_RAMP_RATE_APS     = 35.0f; //TODO control what this value should be
+// Minimum speed-scale floor: current never drops fully to zero at the limit.
+// Enough to hold speed against real friction without bang-bang oscillation.
+constexpr float CONTROL_SPEED_SCALE_FLOOR       = 0.08f;
 
 // ---------------------------------------------------------------------------
 // Utilities

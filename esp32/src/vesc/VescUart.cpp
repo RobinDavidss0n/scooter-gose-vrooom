@@ -6,7 +6,7 @@
 // Uncomment to enable human-readable VESC UART diagnostics.
 #define VESC_UART_DEBUG
 // Print one debug line every N successfully decoded telemetry frames.
-static constexpr uint32_t kDebugPrintInterval = 25;
+static constexpr uint32_t kDebugPrintInterval = 10;
 
 namespace scooter {
 
