@@ -20,7 +20,7 @@ constexpr int VESC_UART_TX_PIN = 18;
 constexpr uint32_t VESC_UART_BAUD = 115200;
 
 constexpr int THROTTLE_ADC_PIN = 16;
-constexpr uint32_t THROTTLE_LOG_INTERVAL_MS = 100;
+constexpr uint32_t THROTTLE_LOG_INTERVAL_MS = 500;
 constexpr uint16_t THROTTLE_IDLE_MV = 850; // Idle throttle gives around 0.8v
 constexpr uint16_t THROTTLE_FULL_MV = 2550; // Full throttle gives around 2.8v
 constexpr uint16_t THROTTLE_IDLE_DEADZONE_MV = 40;
@@ -31,10 +31,20 @@ constexpr uint32_t ALIVE_INTERVAL_MS     = 200;
 constexpr uint32_t UI_INTERVAL_MS        = 100;
 
 // RPM-to-km/h conversion factor.
-// Formula: (wheel_circumference_m * 60) / (motor_pole_pairs * 1000)
-// Example: 6" wheel (0.479 m) + 20-pole motor (10 pairs) => ~0.00287
+// Formula: (PI * wheel_diameter_m * 60) / (motor_pole_pairs * 1000)
+// Hardware: 10" wheel (254 mm) + 30-pole motor (15 pairs) => ~0.003192
 // Calibrate against a known speed source before trusting the display.
-constexpr float kRpmToKmhFactor = 0.00287f;
+constexpr float kRpmToKmhFactor = 0.003192f;
+
+// Control profile defaults
+constexpr float CONTROL_INITIAL_DRIVE_CURRENT_A = 6.0f;
+constexpr float CONTROL_INITIAL_BRAKE_CURRENT_A = 4.0f;
+constexpr float CONTROL_SPEED_TAPER_START_KMH   = 16.0f;
+constexpr float CONTROL_SPEED_LIMIT_KMH         = 60.0f;
+constexpr float CONTROL_DRIVE_RAMP_RATE_APS     = 25.0f;
+constexpr float CONTROL_BRAKE_RAMP_RATE_APS     = 35.0f;
+
+
 
 // 1. Build the explicit Hardware Driver wrapper for the 1.28" Board Layout
 class LGFX_Waveshare_128 : public lgfx::LGFX_Device 
@@ -89,7 +99,7 @@ int throttleRawAdc = 0;
 uint16_t throttleMillivolts = 0;
 float throttleNormalized = 0.0f;
 
-bool throttleLogEnabled = false;
+bool throttleLogEnabled = true;
 
 static lv_obj_t *ui_screen = nullptr;
 static lv_obj_t *speed_label = nullptr;
@@ -193,6 +203,10 @@ void log_physical_throttle(uint32_t nowMs)
         return;
     }
 
+    if(throttleNormalized < 0.05f) {
+        return;
+    }
+
     lastThrottleLogMs = nowMs;
     Serial.printf("throttle adc=%d mv=%u norm=%.3f enabled=%d\n",
                   throttleRawAdc,
@@ -214,7 +228,7 @@ void print_console_help()
     Serial.println(F("  stop"));
     Serial.println(F("  profile drive <amps>"));
     Serial.println(F("  profile brake <amps>"));
-    Serial.println(F("  profile speed <taper_rpm> <limit_rpm>"));
+    Serial.println(F("  profile speed <taper_kmh> <limit_kmh>"));
     Serial.println();
 }
 
@@ -236,11 +250,13 @@ void print_status(uint32_t nowMs)
                   telemetry.inputCurrentA,
                   telemetry.faultCode,
                   telemetry.valid ? static_cast<unsigned long>(nowMs - telemetry.lastResponseMs) : 0UL);
-    Serial.printf("profile drive=%.1fA brake=%.1fA taper=%.0f rpm limit=%.0f rpm\n",
+    const float taperKmh = controlProfile.speedTaperStartRpm * kRpmToKmhFactor;
+    const float limitKmh = controlProfile.speedLimitRpm * kRpmToKmhFactor;
+    Serial.printf("profile drive=%.1fA brake=%.1fA taper=%.1f km/h limit=%.1f km/h\n",
                   controlProfile.maxDriveCurrentA,
                   controlProfile.maxBrakeCurrentA,
-                  controlProfile.speedTaperStartRpm,
-                  controlProfile.speedLimitRpm);
+                  taperKmh,
+                  limitKmh);
 }
 
 void process_console_command(char *line)
@@ -357,15 +373,17 @@ void process_console_command(char *line)
             char *taperValue = strtok_r(nullptr, " \t", &save);
             char *limitValue = strtok_r(nullptr, " \t", &save);
             if (taperValue == nullptr || limitValue == nullptr) {
-                Serial.println(F("Usage: profile speed <taper_rpm> <limit_rpm>"));
+                Serial.println(F("Usage: profile speed <taper_kmh> <limit_kmh>"));
                 return;
             }
 
-            controlProfile.speedTaperStartRpm = max(0.0f, static_cast<float>(atof(taperValue)));
-            controlProfile.speedLimitRpm = max(controlProfile.speedTaperStartRpm, static_cast<float>(atof(limitValue)));
-            Serial.printf("Speed taper %.0f rpm, hard limit %.0f rpm.\n",
-                          controlProfile.speedTaperStartRpm,
-                          controlProfile.speedLimitRpm);
+            const float taperKmh = max(0.0f, static_cast<float>(atof(taperValue)));
+            const float limitKmh = max(taperKmh, static_cast<float>(atof(limitValue)));
+            controlProfile.speedTaperStartRpm = taperKmh / kRpmToKmhFactor;
+            controlProfile.speedLimitRpm = limitKmh / kRpmToKmhFactor;
+            Serial.printf("Speed taper %.1f km/h, hard limit %.1f km/h.\n",
+                          taperKmh,
+                          limitKmh);
             return;
         }
 
@@ -510,12 +528,12 @@ void setup()
     controlInputs.enabled = false;
     controlInputs.throttle = 0.0f;
     controlInputs.brake = 0.0f;
-    controlProfile.maxDriveCurrentA = 6.0f;
-    controlProfile.maxBrakeCurrentA = 4.0f;
-    controlProfile.speedTaperStartRpm = 5600.0f;
-    controlProfile.speedLimitRpm = 6250.0f;
-    controlProfile.driveRampRateAps = 25.0f;
-    controlProfile.brakeRampRateAps = 35.0f;
+    controlProfile.maxDriveCurrentA = CONTROL_INITIAL_DRIVE_CURRENT_A;
+    controlProfile.maxBrakeCurrentA = CONTROL_INITIAL_BRAKE_CURRENT_A;
+    controlProfile.speedTaperStartRpm = CONTROL_SPEED_TAPER_START_KMH / kRpmToKmhFactor;
+    controlProfile.speedLimitRpm = CONTROL_SPEED_LIMIT_KMH / kRpmToKmhFactor;
+    controlProfile.driveRampRateAps = CONTROL_DRIVE_RAMP_RATE_APS;
+    controlProfile.brakeRampRateAps = CONTROL_BRAKE_RAMP_RATE_APS;
 
     vesc.begin();
     vesc.sendCurrent(0.0f);
