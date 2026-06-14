@@ -42,15 +42,15 @@ Speed is proportional to voltage, so at lower speed the motor needs more current
 - *Battery current max regen:* **-8 A** (0.8 C)
 
 #### Voltage
-- *Battery voltage cutoff start:* **34 V** (when the battery voltage drops below this threshold, the VESC starts to limit the power to prevent over-discharging the battery)
+- *Battery voltage cutoff start:* **34.5 V** (when the battery voltage drops below this threshold, the VESC starts to limit the power to prevent over-discharging the battery)
 - *Battery voltage cutoff end:* (when the battery voltage drops below this threshold, the VESC will completely cut off the power to protect the battery)<br>
-	**32 V** (less battery degradation)<br>
+	**33 V** (less battery degradation)<br>
 	**30-31 V** (values under this will cause permanent damage)
 - *Battery voltage regen cutoff start:* **40.5 V** (start to limit regen when the battery voltage start reaching this threshold)
 - *Battery voltage regen cutoff end:* **41 V** (cut off regen when the battery voltage start reaching this threshold, prevents overcharging the battery)
 
 #### Temperature
-- *Motor temp cutoff start:* **80°C** (start limiting current when the motor temperature reaches this threshold)
+- *Motor temp cutoff start:* **70°C** (start limiting current when the motor temperature reaches this threshold)
 - *Motor temp cutoff end:* **95°C** (completely cut off current when the motor temperature reaches this threshold)
 
 #### BMS
