@@ -21,11 +21,15 @@ public:
     void sendBrakeCurrent(float currentA);
 
     // --- State ---
-    bool isConnected(uint32_t nowMs, uint32_t timeoutMs = 1000) const;
-    bool hasFreshTelemetry(uint32_t nowMs, uint32_t maxAgeMs = 500) const;
+    bool isConnected(uint32_t nowMs, uint32_t timeoutMs) const;
+    bool hasFreshTelemetry(uint32_t nowMs, uint32_t maxAgeMs) const;
     // Returns true if a frame error (bad start/stop byte, CRC mismatch, oversize
     // frame) occurred within the last windowMs milliseconds.
-    bool hasRecentRxError(uint32_t nowMs, uint32_t windowMs = 1000) const;
+    bool hasRecentRxError(uint32_t nowMs, uint32_t windowMs) const;
+    // Convenience overloads using the named constants from config.h.
+    bool isConnected(uint32_t nowMs) const;
+    bool hasFreshTelemetry(uint32_t nowMs) const;
+    bool hasRecentRxError(uint32_t nowMs) const;
 
     const VescTelemetry &telemetry() const { return _telemetry; }
     uint32_t             lastRxMs()  const { return _lastRxMs;  }

@@ -3,10 +3,12 @@
 #include <math.h>
 #include <string.h>
 
+#include "config.h"
+
 // Uncomment to enable human-readable VESC UART diagnostics.
 #define VESC_UART_DEBUG
 // Print one debug line every N successfully decoded telemetry frames.
-static constexpr uint32_t kDebugPrintInterval = 10;
+static constexpr uint32_t kDebugPrintInterval = 25;
 
 namespace scooter {
 
@@ -92,13 +94,22 @@ void VescUart::sendBrakeCurrent(float currentA) {
 bool VescUart::isConnected(uint32_t nowMs, uint32_t timeoutMs) const {
     return _lastRxMs != 0 && (nowMs - _lastRxMs) <= timeoutMs;
 }
+bool VescUart::isConnected(uint32_t nowMs) const {
+    return isConnected(nowMs, VESC_CONNECTED_TIMEOUT_MS);
+}
 
 bool VescUart::hasFreshTelemetry(uint32_t nowMs, uint32_t maxAgeMs) const {
     return _telemetry.valid && (nowMs - _telemetry.lastResponseMs) <= maxAgeMs;
 }
+bool VescUart::hasFreshTelemetry(uint32_t nowMs) const {
+    return hasFreshTelemetry(nowMs, VESC_TELEMETRY_MAX_AGE_MS);
+}
 
 bool VescUart::hasRecentRxError(uint32_t nowMs, uint32_t windowMs) const {
     return _lastRxErrorMs != 0 && (nowMs - _lastRxErrorMs) <= windowMs;
+}
+bool VescUart::hasRecentRxError(uint32_t nowMs) const {
+    return hasRecentRxError(nowMs, VESC_RX_ERROR_WINDOW_MS);
 }
 
 // ---------------------------------------------------------------------------

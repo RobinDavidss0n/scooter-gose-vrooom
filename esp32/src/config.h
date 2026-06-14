@@ -28,9 +28,20 @@ constexpr uint16_t THROTTLE_IDLE_DEADZONE_MV = 40;
 // Main-loop tick intervals
 // ---------------------------------------------------------------------------
 constexpr uint32_t CONTROL_INTERVAL_MS   = 10;
-constexpr uint32_t TELEMETRY_INTERVAL_MS = 100;
-constexpr uint32_t ALIVE_INTERVAL_MS     = 200;
+constexpr uint32_t TELEMETRY_INTERVAL_MS = 25;
+constexpr uint32_t ALIVE_INTERVAL_MS     = 500;
 constexpr uint32_t UI_INTERVAL_MS        = 100;
+
+// ---------------------------------------------------------------------------
+// VESC link health thresholds
+// ---------------------------------------------------------------------------
+// Declare offline if no valid RX byte received within this window.
+constexpr uint32_t VESC_CONNECTED_TIMEOUT_MS    = 1000;
+// Declare telemetry stale if no successful GET_VALUES decode within this window.
+// 3 missed frames at 40 Hz = 75 ms.
+constexpr uint32_t VESC_TELEMETRY_MAX_AGE_MS    = 75;
+// Show comms warning if any frame error occurred within this window.
+constexpr uint32_t VESC_RX_ERROR_WINDOW_MS      = 1000;
 
 // ---------------------------------------------------------------------------
 // Speed conversion
@@ -42,8 +53,6 @@ constexpr float kRpmToKmhFactor = 0.003192f;
 
 // ---------------------------------------------------------------------------
 // Control profile defaults
-// -----------------------------------------------------------constexpr float CONTROL_SPEED_LIMIT_KMH         = 30.0f;
-// Taper begins at this fraction of the limit (60 %), giving a wide band to se----------------
 constexpr float CONTROL_INITIAL_DRIVE_CURRENT_A = 6.0f;
 constexpr float CONTROL_INITIAL_BRAKE_CURRENT_A = 4.0f;
 constexpr float CONTROL_SPEED_LIMIT_KMH         = 30.0f;
