@@ -1,0 +1,90 @@
+flowchart LR
+    subgraph CHASSIS[CHASSIS — Battery, VESC, Rear Light]
+        B[Battery 36V] == 36V+ & GND ==> XT60[XT60 Junction]
+        XT60 == 36V+ & GND ==> VESC[VESC]
+        VESC --- COMM[VESC COMM Port]
+
+        %% Runs straight to 12V, no separate step-up board needed
+        XT60 -- 36V+ --> SD["XL7015 Step-down<br>(adjusted to 12V output)"]
+        XT60 -- GND --> SD
+
+        SD -- 12V+ OUT --> RL_P((Rear Light +))
+        RL_M((Rear Light -)) --> MOS_R_D(Drain Pin 2)
+
+        %% Common Ground: star point for CHASSIS — bonds SD's clean output + VESC's COMM/accessory ground here (VESC's main/motor-current ground pin stays unconnected, avoiding a ground loop)
+        CG((Common Ground))
+        SD -- GND OUT --> CG
+        COMM -- GND --> CG
+        CG --- MOS_R_S(Source Pin 3)
+
+        subgraph MOSFET_REAR[Rear MOSFET IRLB8721]
+            MOS_R_G(Gate Pin 1)
+            MOS_R_D
+            MOS_R_S
+        end
+    end
+
+    subgraph FERRITE["Ferrite Core Clamp — full STEM bundle (CHASSIS end)"]
+        FE1(OG1 pass-through)
+        FE2(OG2 pass-through)
+        FE3(OG3 pass-through)
+        FE4(OG4 pass-through)
+        FE5(OG5 pass-through)
+        FEN(N1 pass-through)
+    end
+
+    subgraph STEM["STEM WIRING (folding joint) — bundled with heat-shrink in segments"]
+        subgraph ORIGINAL_CABLE[Original cable, 5 conductors — now logic + power]
+            OG1["1: UART TX"]
+            OG2["2: UART RX"]
+            OG3["3: GPIO brake signal"]
+            OG4["4: 5V+"]
+            OG5["5: 12V+ to front light"]
+        end
+        subgraph NEW_CABLE[New cable, 1x 0.75mm² — GND]
+            N1["N1: Common GND"]
+        end
+    end
+
+    subgraph HANDLEBARS[HANDLEBARS — MCU, Front Light]
+        PWR5V((5V Local))
+        subgraph C1_ELCO[C1a: Electrolytic 470-1000µF 16V]
+            C1E_POS(Anode +)
+            C1E_NEG(Cathode -)
+        end
+        subgraph C1_CER[C1b: Ceramic 100nF]
+            C1C_1(Pin 1)
+            C1C_2(Pin 2)
+        end
+        PWR5V -.-> C1E_POS
+        C1E_NEG -.- HB_GND
+        PWR5V -.-> C1C_1
+        C1C_2 -.- HB_GND
+        PWR5V --> MCU[MCU]
+        HB_GND((Handlebar Ground))
+        FL_P((Front Light +))
+        FL_M((Front Light -)) --> MOS_F_D(Drain Pin 2)
+
+        %% Front MOSFET lives locally at the handlebars, so no extra conductor is needed for its gate signal
+        MCU -- GPIO Front --> R1_100[100Ω] --> MOS_F_G(Gate Pin 1)
+        MOS_F_G -. 10kΩ Pull-down .- HB_GND
+        HB_GND --- MOS_F_S(Source Pin 3)
+
+        subgraph MOSFET_FRONT[Front MOSFET IRLB8721]
+            MOS_F_G
+            MOS_F_D
+            MOS_F_S
+        end
+    end
+
+    %% Original cable (logic + power)
+    MCU -- TX --> OG1 --> FE1 --> COMM
+    COMM -- RX --> FE2 --> OG2 --> MCU
+    MCU -- "GPIO Rear (brake status)" --> OG3 --> FE3 --> MOS_R_G
+    COMM -- 5V+ --> FE4 --> OG4 --> PWR5V
+    SD -- 12V+ OUT --> FE5 --> OG5 --> FL_P
+
+    %% New cable (common ground return for everything above)
+    CG -- GND --> FEN --> N1 --> HB_GND
+
+

@@ -1,4 +1,5 @@
 #include "console.h"
+#include "lights.h"
 
 static char   s_lineBuffer[96] = {0};
 static size_t s_lineLength     = 0;
@@ -17,6 +18,10 @@ void print_console_help()
     Serial.println(F("  profile drive <amps>"));
     Serial.println(F("  profile brake <amps>"));
     Serial.println(F("  profile speed <taper_kmh> <limit_kmh>"));
+    Serial.println(F("  light front 0|1"));
+    Serial.println(F("  light front_brightness <0..255>"));
+    Serial.println(F("  light rear_idle <0..255>"));
+    Serial.println(F("  light rear_brake <0..255>"));
     Serial.println();
 }
 
@@ -178,6 +183,61 @@ static void process_console_command(char *line, scooter::ConsoleContext &ctx)
         }
 
         Serial.println(F("Unknown profile field."));
+        return;
+    }
+
+    if (strcmp(command, "light") == 0) {
+        char *field = strtok_r(nullptr, " \t", &save);
+        if (field == nullptr) {
+            Serial.println(F("Usage: light front 0|1 | front_brightness <0..255> | rear_idle <0..255> | rear_brake <0..255>"));
+            return;
+        }
+
+        if (strcmp(field, "front") == 0) {
+            char *value = strtok_r(nullptr, " \t", &save);
+            if (value == nullptr) {
+                Serial.println(F("Usage: light front 0|1"));
+                return;
+            }
+            frontLightOn = atoi(value) != 0;
+            Serial.printf("Front light %s.\n", frontLightOn ? "on" : "off");
+            return;
+        }
+
+        if (strcmp(field, "front_brightness") == 0) {
+            char *value = strtok_r(nullptr, " \t", &save);
+            if (value == nullptr) {
+                Serial.println(F("Usage: light front_brightness <0..255>"));
+                return;
+            }
+            frontLightBrightness = static_cast<uint8_t>(constrain(atoi(value), 0, 255));
+            Serial.printf("Front light brightness set to %u.\n", frontLightBrightness);
+            return;
+        }
+
+        if (strcmp(field, "rear_idle") == 0) {
+            char *value = strtok_r(nullptr, " \t", &save);
+            if (value == nullptr) {
+                Serial.println(F("Usage: light rear_idle <0..255>"));
+                return;
+            }
+            rearLightIdleBrightness = static_cast<uint8_t>(constrain(atoi(value), 0, 255));
+            Serial.printf("Rear light idle brightness set to %u.\n", rearLightIdleBrightness);
+            return;
+        }
+
+        if (strcmp(field, "rear_brake") == 0) {
+            char *value = strtok_r(nullptr, " \t", &save);
+            if (value == nullptr) {
+                Serial.println(F("Usage: light rear_brake <0..255>"));
+                return;
+            }
+            rearLightBrakeBrightness = static_cast<uint8_t>(constrain(atoi(value), 0, 255));
+            Serial.printf("Rear light brake brightness set to %u.\n", rearLightBrakeBrightness);
+            return;
+        }
+
+        Serial.println(F("Unknown light field."));
         return;
     }
 

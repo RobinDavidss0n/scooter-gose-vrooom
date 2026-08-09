@@ -5,6 +5,7 @@
 #include "vesc/VescUart.h"
 #include "throttle.h"
 #include "console.h"
+#include "lights.h"
 #include "ui.h"
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,8 @@ void setup()
 
     setup_ui();
     lastLvglTickMs = millis();
+
+    lights_init();
 
     controlInputs.enabled            = false;
     controlInputs.throttle           = 0.0f;
@@ -101,6 +104,7 @@ void loop()
         } else {
             vesc.sendCurrent(controlOutput.driveCurrentA);
         }
+        update_lights(controlOutput.brakeCurrentA > 0.01f);
     }
 
     if (nowMs - lastTelemetryRequestMs >= TELEMETRY_INTERVAL_MS) {

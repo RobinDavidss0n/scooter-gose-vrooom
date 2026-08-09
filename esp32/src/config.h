@@ -67,6 +67,24 @@ constexpr float CONTROL_BRAKE_RAMP_RATE_APS     = 35.0f; //TODO control what thi
 constexpr float CONTROL_SPEED_SCALE_FLOOR       = 0.08f;
 
 // ---------------------------------------------------------------------------
+// Lights (PWM, low-side MOSFET gate drive)
+// Pins are placeholders — confirm against wiring/diagram.mmd before flashing.
+// ---------------------------------------------------------------------------
+constexpr int      FRONT_LIGHT_PIN           = 5;
+constexpr int      REAR_LIGHT_PIN            = 6;
+constexpr uint8_t  FRONT_LIGHT_PWM_CHANNEL   = 0;
+constexpr uint8_t  REAR_LIGHT_PWM_CHANNEL    = 1;
+constexpr uint32_t LIGHT_PWM_FREQ_HZ         = 5000;
+constexpr uint8_t  LIGHT_PWM_RESOLUTION_BITS = 8;
+
+// Default brightness (0-255). Not tied to any control input yet — adjust
+// here or via the console "light" command until dimming/day-night/touch
+// control is decided.
+constexpr uint8_t  FRONT_LIGHT_DEFAULT_BRIGHTNESS      = 200;
+constexpr uint8_t  REAR_LIGHT_DEFAULT_IDLE_BRIGHTNESS  = 40;
+constexpr uint8_t  REAR_LIGHT_DEFAULT_BRAKE_BRIGHTNESS = 255;
+
+// ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
 inline float clamp01(float value)
