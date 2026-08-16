@@ -19,6 +19,7 @@ struct ConsoleContext {
     CurrentController     &controller;
     VescUart              &vesc;
     bool                  &throttleLogEnabled;
+    bool                  &unrestrictedModeActive;
 };
 
 }  // namespace scooter

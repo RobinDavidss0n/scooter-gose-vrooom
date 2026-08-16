@@ -70,8 +70,8 @@ constexpr float CONTROL_SPEED_SCALE_FLOOR       = 0.08f;
 // Lights (PWM, low-side MOSFET gate drive)
 // Pins are placeholders — confirm against wiring/diagram.mmd before flashing.
 // ---------------------------------------------------------------------------
-constexpr int      FRONT_LIGHT_PIN           = 5;
-constexpr int      REAR_LIGHT_PIN            = 6;
+constexpr int      FRONT_LIGHT_PIN           = 15;
+constexpr int      REAR_LIGHT_PIN            = 21;
 constexpr uint8_t  FRONT_LIGHT_PWM_CHANNEL   = 0;
 constexpr uint8_t  REAR_LIGHT_PWM_CHANNEL    = 1;
 constexpr uint32_t LIGHT_PWM_FREQ_HZ         = 5000;
@@ -83,6 +83,22 @@ constexpr uint8_t  LIGHT_PWM_RESOLUTION_BITS = 8;
 constexpr uint8_t  FRONT_LIGHT_DEFAULT_BRIGHTNESS      = 200;
 constexpr uint8_t  REAR_LIGHT_DEFAULT_IDLE_BRIGHTNESS  = 40;
 constexpr uint8_t  REAR_LIGHT_DEFAULT_BRAKE_BRIGHTNESS = 255;
+
+// ---------------------------------------------------------------------------
+// Turn signals (L/R buttons + blinker LEDs via MCP23017 I2C expander)
+// See wiring/diagram.mmd — GPIO0 is the board's BOOT pin, reused here since
+// I2C idles high, which is what BOOT needs at power-on anyway.
+// ---------------------------------------------------------------------------
+constexpr int      MCP23017_SDA_PIN     = 33;
+constexpr int      MCP23017_SCL_PIN     = 0;
+constexpr uint8_t  MCP_BTN_LEFT_PIN     = 0;  // GPA0
+constexpr uint8_t  MCP_BTN_RIGHT_PIN    = 1;  // GPA1
+constexpr uint8_t  MCP_BLINK_LEFT_PIN   = 2;  // GPA2
+constexpr uint8_t  MCP_BLINK_RIGHT_PIN  = 3;  // GPA3
+constexpr uint32_t BUTTON_DEBOUNCE_MS   = 30;
+constexpr uint32_t BLINKER_INTERVAL_MS  = 500;
+// Only used while unrestrictedModeActive; otherwise the buttons toggle blinkers.
+constexpr float    SPEED_LIMIT_STEP_RPM = 200.0f;
 
 // ---------------------------------------------------------------------------
 // Utilities

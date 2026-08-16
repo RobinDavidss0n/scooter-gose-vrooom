@@ -6,6 +6,7 @@
 #include "throttle.h"
 #include "console.h"
 #include "lights.h"
+#include "blinkers.h"
 #include "ui.h"
 
 // ---------------------------------------------------------------------------
@@ -45,6 +46,7 @@ void setup()
     lastLvglTickMs = millis();
 
     lights_init();
+    blinkers_init();
 
     controlInputs.enabled            = false;
     controlInputs.throttle           = 0.0f;
@@ -87,9 +89,12 @@ void loop()
         controlOutput,
         currentController,
         vesc,
-        throttleLogEnabled
+        throttleLogEnabled,
+        unrestrictedModeActive
     };
     poll_console(consoleCtx);
+
+    blinkers_poll(nowMs, controlProfile);
 
     read_physical_throttle(controlInputs);
     log_physical_throttle(nowMs, controlInputs.enabled);

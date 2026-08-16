@@ -18,6 +18,7 @@ void print_console_help()
     Serial.println(F("  profile drive <amps>"));
     Serial.println(F("  profile brake <amps>"));
     Serial.println(F("  profile speed <taper_kmh> <limit_kmh>"));
+    Serial.println(F("  mode unrestricted 0|1"));
     Serial.println(F("  light front 0|1"));
     Serial.println(F("  light front_brightness <0..255>"));
     Serial.println(F("  light rear_idle <0..255>"));
@@ -55,6 +56,10 @@ void print_status(scooter::ConsoleContext &ctx, uint32_t nowMs)
                   ctx.profile.maxBrakeCurrentA,
                   taperKmh,
                   limitKmh);
+
+    Serial.printf("unrestricted_mode=%d (L/R buttons %s)\n",
+                  ctx.unrestrictedModeActive,
+                  ctx.unrestrictedModeActive ? "adjust speed limit" : "drive blinkers");
 }
 
 static void process_console_command(char *line, scooter::ConsoleContext &ctx)
@@ -183,6 +188,24 @@ static void process_console_command(char *line, scooter::ConsoleContext &ctx)
         }
 
         Serial.println(F("Unknown profile field."));
+        return;
+    }
+
+    if (strcmp(command, "mode") == 0) {
+        char *field = strtok_r(nullptr, " \t", &save);
+        if (field == nullptr || strcmp(field, "unrestricted") != 0) {
+            Serial.println(F("Usage: mode unrestricted 0|1"));
+            return;
+        }
+        char *value = strtok_r(nullptr, " \t", &save);
+        if (value == nullptr) {
+            Serial.println(F("Usage: mode unrestricted 0|1"));
+            return;
+        }
+        ctx.unrestrictedModeActive = atoi(value) != 0;
+        Serial.printf("Unrestricted mode %s. L/R buttons now %s.\n",
+                      ctx.unrestrictedModeActive ? "on" : "off",
+                      ctx.unrestrictedModeActive ? "adjust speed limit" : "drive blinkers");
         return;
     }
 

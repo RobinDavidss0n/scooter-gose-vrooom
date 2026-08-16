@@ -2,52 +2,70 @@ flowchart LR
     subgraph CHASSIS[CHASSIS — Battery, VESC, Rear Light]
         B[Battery 36V] == 36V+ & GND ==> XT60[XT60 Junction]
         XT60 == 36V+ & GND ==> VESC[VESC]
-        VESC --- COMM[VESC COMM Port]
+        VESC --- COMM
 
         %% Runs straight to 12V, no separate step-up board needed
         XT60 -- 36V+ --> SD["XL7015 Step-down<br>(adjusted to 12V output)"]
         XT60 -- GND --> SD
 
-        SD -- 12V+ OUT --> RL_P((Rear Light +))
-        RL_M((Rear Light -)) --> MOS_R_D(Drain Pin 2)
+        %% MOSFET leg wiring (same on all 4 MOSFETs here, TO-220 package, text side facing you,
+        %% pins left-to-right = Gate/Drain/Source): White=Gate, Grey=Drain, Black=Source
+        SD -- 12V+ OUT --> RL_P((Rear Light + — Yellow))
+        RL_M((Rear Light -)) --> MOS_R_D(Drain Pin 2 — Grey)
 
         %% Common Ground: star point for CHASSIS — bonds SD's clean output + VESC's COMM/accessory ground here (VESC's main/motor-current ground pin stays unconnected, avoiding a ground loop)
-        CG((Common Ground))
+        CG((Common Ground — Black))
         SD -- GND OUT --> CG
-        COMM -- GND --> CG
-        CG --- MOS_R_S(Source Pin 3)
+        COMM_GND -- GND --> CG
+        CG --- MOS_R_S(Source Pin 3 — Black)
+        MOS_R_G -. 10kΩ Pull-down .- CG
 
         subgraph MOSFET_REAR[Rear MOSFET IRLB8721]
-            MOS_R_G(Gate Pin 1)
+            MOS_R_G(Gate Pin 1 — White)
             MOS_R_D
             MOS_R_S
+        end
+
+        %% Pin numbers follow top-to-bottom order in the board photo, not a confirmed silkscreen Pin 1 - verify before soldering
+        subgraph COMM["VESC COMM Header (6 COMM, MKS ESC Mini Pro V6.70)"]
+            COMM_ADC3(Pin 1: ADC3 - unused)
+            COMM_ADC2(Pin 2: ADC2 - unused)
+            COMM_TX(Pin 3: TX/SCL)
+            COMM_RX(Pin 4: RX/SDA)
+            COMM_ADC1(Pin 5: ADC1 - unused)
+            COMM_GND(Pin 6: GND)
+            COMM_3V3(Pin 7: 3.3V - unused)
+            COMM_5V(Pin 8: 5V)
         end
     end
 
     subgraph FERRITE["Ferrite Core Clamp — full STEM bundle (CHASSIS end)"]
-        FE1(OG1 pass-through)
-        FE2(OG2 pass-through)
-        FE3(OG3 pass-through)
-        FE4(OG4 pass-through)
-        FE5(OG5 pass-through)
-        FEN(N1 pass-through)
+        FE1(OG1 pass-through — Blue)
+        FE2(OG2 pass-through — Green)
+        FE3(OG3 pass-through — Light Gray)
+        FE4(OG4 pass-through — Red)
+        FE5(OG5 pass-through — Yellow)
+        FEN(N1 pass-through — Black)
     end
 
+    %% Wire colors chosen to match the MCU's own ribbon below wherever the STEM's existing 6-wire
+    %% bundle allows it (TX=Blue, RX=Green, GND=Black, 5V=Red match on both cables) so the same
+    %% signal looks the same color end-to-end, even though the two cables are physically separate.
     subgraph STEM["STEM WIRING (folding joint) — bundled with heat-shrink in segments"]
         subgraph ORIGINAL_CABLE[Original cable, 5 conductors — now logic + power]
-            OG1["1: UART TX"]
-            OG2["2: UART RX"]
-            OG3["3: GPIO brake signal"]
-            OG4["4: 5V+"]
-            OG5["5: 12V+ to front light"]
+            OG1["1: UART TX — Blue"]
+            OG2["2: UART RX — Green"]
+            OG3["3: GPIO brake signal — Light Gray"]
+            OG4["4: 5V+ — Red"]
+            OG5["5: 12V+ to front light — Yellow"]
         end
         subgraph NEW_CABLE[New cable, 1x 0.75mm² — GND]
-            N1["N1: Common GND"]
+            N1["N1: Common GND — Black"]
         end
     end
 
     subgraph HANDLEBARS[HANDLEBARS — MCU, Front Light]
-        PWR5V((5V Local))
+        PWR5V((5V Local — Red))
         subgraph C1_ELCO[C1a: Electrolytic 470-1000µF 16V]
             C1E_POS(Anode +)
             C1E_NEG(Cathode -)
@@ -60,31 +78,159 @@ flowchart LR
         C1E_NEG -.- HB_GND
         PWR5V -.-> C1C_1
         C1C_2 -.- HB_GND
-        PWR5V --> MCU[MCU]
-        HB_GND((Handlebar Ground))
-        FL_P((Front Light +))
-        FL_M((Front Light -)) --> MOS_F_D(Drain Pin 2)
+        PWR5V --> MCU_VSYS
+        HB_GND((Handlebar Ground — Black))
+        PWR12V((12V Local — Yellow))
+        PWR12V --> FL_P((Front Light + — Yellow))
+        FL_M((Front Light -)) --> MOS_F_D(Drain Pin 2 — Grey)
+
+        %% GPIO15/21 chosen from the exposed header's free pins (16/17/18 already used for throttle/UART)
+        %% GPIO33/GPIO0 are the last 2 free pins on the header — reused here as I2C SDA/SCL for the
+        %% turn-signal expander (I2C idles high, so GPIO0/BOOT still reads HIGH at power-on/reset)
+        %% Colors below are the board's own 12-wire ribbon, fixed top-to-bottom order (pin-definition.png):
+        %% GND=Black, VSYS=Red, RESET=Green, BOOT=Yellow, GND=Black(2nd, same net), 3V3=Red,
+        %% GPIO15=Brown, GPIO16=Orange, GPIO17=Green, GPIO18=Blue, GPIO21=Purple, GPIO33=Grey.
+        %% CAUTION: VSYS and 3V3 are both Red on this ribbon — tag one before wiring, since crossing
+        %% them feeds 5V into the 3.3V-only MCP23017 (abs max ~5.5V, very little margin).
+        subgraph MCU["ESP32-S3-Touch-LCD-1.28"]
+            MCU_GND(GND — Black)
+            MCU_VSYS(VSYS - 5V in — Red)
+            MCU_RESET(RESET - unused — Green)
+            MCU_SCL(GPIO0/BOOT: I2C SCL — Yellow)
+            MCU_3V3(3V3 - 3.3V out — Red)
+            MCU_FRONT(GPIO15: Front light gate — Brown)
+            MCU_THROTTLE(GPIO16: Throttle ADC — Orange)
+            MCU_RX(GPIO17: UART RX — Green)
+            MCU_TX(GPIO18: UART TX — Blue)
+            MCU_REAR(GPIO21: Rear light gate signal — Purple)
+            MCU_SDA(GPIO33: I2C SDA — Grey)
+        end
+        MCU_GND --- HB_GND
 
         %% Front MOSFET lives locally at the handlebars, so no extra conductor is needed for its gate signal
-        MCU -- GPIO Front --> R1_100[100Ω] --> MOS_F_G(Gate Pin 1)
+        MCU_FRONT -- GPIO Front --> R1_100[100Ω] --> MOS_F_G(Gate Pin 1 — White)
         MOS_F_G -. 10kΩ Pull-down .- HB_GND
-        HB_GND --- MOS_F_S(Source Pin 3)
+        HB_GND --- MOS_F_S(Source Pin 3 — Black)
 
         subgraph MOSFET_FRONT[Front MOSFET IRLB8721]
             MOS_F_G
             MOS_F_D
             MOS_F_S
         end
+
+        %% MCP23017 needs 3.3V logic to match the ESP32-S3's I2C pins (ESP32 GPIOs aren't 5V tolerant) —
+        %% the header already breaks out a native 3V3 pin, so no separate LDO is needed
+        MCU_3V3 -- 3.3V --> MCP_VDD
+
+        %% Turn-signal L/R buttons double as speed-limit adjust buttons (firmware-arbitrated, see
+        %% blinkers.cpp) — both button inputs and blinker LED outputs live on the expander so the
+        %% blink function can be fully disabled in software when in unrestricted-speed mode
+        MCU_SDA -- I2C SDA --> MCP_SDA
+        MCU_SCL -- I2C SCL --> MCP_SCL
+
+        subgraph EXPANDER["MCP23017 I2C GPIO Expander (addr 0x20)"]
+            MCP_SDA(SDA — Grey)
+            MCP_SCL(SCL — Yellow)
+            MCP_VDD(VDD — Red)
+            MCP_GND(GND — Black)
+            MCP_GPA0(GPA0: BTN Left in)
+            MCP_GPA1(GPA1: BTN Right in)
+            MCP_GPA2(GPA2: Blink Left out)
+            MCP_GPA3(GPA3: Blink Right out)
+        end
+        MCP_GND --- HB_GND
+
+        BTN_L((Left Turn /<br>Speed− Button)) --- MCP_GPA0
+        BTN_L --- HB_GND
+        BTN_R((Right Turn /<br>Speed+ Button)) --- MCP_GPA1
+        BTN_R --- HB_GND
+
+        %% Blinkers turned out to be the same 12V LED modules as front/rear (measured 0.11A@12V) —
+        %% not small 5V indicator LEDs, so they use the same low-side MOSFET pattern as the other
+        %% lights instead of an NPN. Mounted at the handlebar cluster — no spare STEM conductor left
+        %% to route them elsewhere, so they tap the 12V already delivered here for the front light.
+        %% XL7015 has plenty of headroom for all 4 lights at once (7W recommended vs ~3.6-4W worst
+        %% case, see repo notes) — wired straight to 12V, no current-limiting resistor needed.
+        PWR12V --> LED_L((Left Blinker LED)) --> MOS_BL_D(Drain Pin 2 — Grey)
+        MCP_GPA2 -- Gate --> R3_100[100Ω] --> MOS_BL_G(Gate Pin 1 — White)
+        MOS_BL_G -. 10kΩ Pull-down .- HB_GND
+        HB_GND --- MOS_BL_S(Source Pin 3 — Black)
+        subgraph MOSFET_BLINK_L[Left Blinker MOSFET IRLB8721]
+            MOS_BL_G
+            MOS_BL_D
+            MOS_BL_S
+        end
+
+        PWR12V --> LED_R((Right Blinker LED)) --> MOS_BR_D(Drain Pin 2 — Grey)
+        MCP_GPA3 -- Gate --> R4_100[100Ω] --> MOS_BR_G(Gate Pin 1 — White)
+        MOS_BR_G -. 10kΩ Pull-down .- HB_GND
+        HB_GND --- MOS_BR_S(Source Pin 3 — Black)
+        subgraph MOSFET_BLINK_R[Right Blinker MOSFET IRLB8721]
+            MOS_BR_G
+            MOS_BR_D
+            MOS_BR_S
+        end
     end
 
-    %% Original cable (logic + power)
-    MCU -- TX --> OG1 --> FE1 --> COMM
-    COMM -- RX --> FE2 --> OG2 --> MCU
-    MCU -- "GPIO Rear (brake status)" --> OG3 --> FE3 --> MOS_R_G
-    COMM -- 5V+ --> FE4 --> OG4 --> PWR5V
-    SD -- 12V+ OUT --> FE5 --> OG5 --> FL_P
+    %% Original cable (logic + power) — VESC RX/SDA receives MCU's TX, VESC TX/SCL feeds MCU's RX
+    MCU_TX -- "TX (Blue)" --> OG1 --> FE1 --> COMM_RX
+    COMM_TX -- "RX (Green)" --> FE2 --> OG2 --> MCU_RX
+    MCU_REAR -- "GPIO Rear, brake status (Light Gray)" --> OG3 --> FE3 --> R2_100[100Ω] --> MOS_R_G
+    COMM_5V -- "5V+ (Red)" --> FE4 --> OG4 --> PWR5V
+    SD -- "12V+ OUT (Yellow)" --> FE5 --> OG5 --> PWR12V
 
     %% New cable (common ground return for everything above)
-    CG -- GND --> FEN --> N1 --> HB_GND
+    CG -- "GND (Black)" --> FEN --> N1 --> HB_GND
+
+    %% Wire-color legend (cosmetic node fills matching the physical cable colors described above)
+    style N1 fill:#000000,color:#ffffff
+    style OG1 fill:#1f6feb,color:#ffffff
+    style OG2 fill:#2ea043,color:#ffffff
+    style OG3 fill:#d3d3d3,color:#000000
+    style OG4 fill:#d32f2f,color:#ffffff
+    style OG5 fill:#e6c400,color:#000000
+    style COMM_RX fill:#1f6feb,color:#ffffff
+    style COMM_TX fill:#2ea043,color:#ffffff
+    style COMM_GND fill:#000000,color:#ffffff
+    style COMM_5V fill:#d32f2f,color:#ffffff
+    style MCU_GND fill:#000000,color:#ffffff
+    style MCU_VSYS fill:#d32f2f,color:#ffffff
+    style MCU_RESET fill:#2ea043,color:#ffffff
+    style MCU_SCL fill:#e6c400,color:#000000
+    style MCU_3V3 fill:#d32f2f,color:#ffffff
+    style MCU_FRONT fill:#8b4513,color:#ffffff
+    style MCU_THROTTLE fill:#ff8c00,color:#000000
+    style MCU_RX fill:#2ea043,color:#ffffff
+    style MCU_TX fill:#1f6feb,color:#ffffff
+    style MCU_REAR fill:#800080,color:#ffffff
+    style MCU_SDA fill:#808080,color:#ffffff
+    style CG fill:#000000,color:#ffffff
+    style HB_GND fill:#000000,color:#ffffff
+    style MCP_GND fill:#000000,color:#ffffff
+    style FEN fill:#000000,color:#ffffff
+    style PWR5V fill:#d32f2f,color:#ffffff
+    style MCP_VDD fill:#d32f2f,color:#ffffff
+    style PWR12V fill:#e6c400,color:#000000
+    style RL_P fill:#e6c400,color:#000000
+    style FL_P fill:#e6c400,color:#000000
+    style MCP_SCL fill:#e6c400,color:#000000
+    style MCP_SDA fill:#808080,color:#ffffff
+    style FE1 fill:#1f6feb,color:#ffffff
+    style FE2 fill:#2ea043,color:#ffffff
+    style FE3 fill:#d3d3d3,color:#000000
+    style FE4 fill:#d32f2f,color:#ffffff
+    style FE5 fill:#e6c400,color:#000000
+    style MOS_R_G fill:#ffffff,stroke:#333333,color:#000000
+    style MOS_F_G fill:#ffffff,stroke:#333333,color:#000000
+    style MOS_BL_G fill:#ffffff,stroke:#333333,color:#000000
+    style MOS_BR_G fill:#ffffff,stroke:#333333,color:#000000
+    style MOS_R_D fill:#808080,color:#ffffff
+    style MOS_F_D fill:#808080,color:#ffffff
+    style MOS_BL_D fill:#808080,color:#ffffff
+    style MOS_BR_D fill:#808080,color:#ffffff
+    style MOS_R_S fill:#000000,color:#ffffff
+    style MOS_F_S fill:#000000,color:#ffffff
+    style MOS_BL_S fill:#000000,color:#ffffff
+    style MOS_BR_S fill:#000000,color:#ffffff
 
 
