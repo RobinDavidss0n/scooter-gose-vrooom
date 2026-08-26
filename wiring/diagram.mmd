@@ -1,12 +1,45 @@
 flowchart LR
     subgraph CHASSIS[CHASSIS — Battery, VESC, Rear Light]
         B[Battery 36V] == 36V+ & GND ==> XT60[XT60 Junction]
-        XT60 == 36V+ & GND ==> VESC[VESC]
+
+        %% Soft power switch: gates the VESC only, not SD. SD (and its 12V rail)
+        %% must stay always-on so there's power available to bootstrap the latch
+        %% below from a fully-off state — see PWR_RELAY/PWR_LATCH. Nothing else
+        %% draws current from 12V while "off" since all light MOSFET gates default
+        %% low via their pull-downs whenever the MCU/expander isn't driving them.
+        %% Relay sized against the VESC's actual configured battery current max
+        %% (20-25A safe/overdrive, ~30A theoretical-with-degradation ceiling — see
+        %% vesc/setup.md) — 40A contacts give comfortable margin.
+        XT60 -- 36V+ --> PWR_RELAY_COM(COM — Pin 30)
+        XT60 -- GND --> VESC[VESC]
         VESC --- COMM
 
-        %% Runs straight to 12V, no separate step-up board needed
-        XT60 -- 36V+ --> SD["XL7015 Step-down<br>(adjusted to 12V output)"]
-        XT60 -- GND --> SD
+        subgraph PWR_RELAY["Power Relay — JD1912, 12V coil, 40A SPST-NO, built-in flyback diode"]
+            PWR_RELAY_COM
+            PWR_RELAY_NO(NO — Pin 87)
+            PWR_RELAY_COILP(Coil + — Pin 86)
+            PWR_RELAY_COILN(Coil - — Pin 85)
+        end
+        PWR_RELAY_COM -. "closes when coil energized" .-> PWR_RELAY_NO
+        PWR_RELAY_NO -- 36V+ switched --> VESC
+
+        %% Latch: either the button (bootstrap, from fully off) or the MCU's hold
+        %% signal (once booted) can independently pull the transistor on via the
+        %% diode-OR. Releasing both — i.e. MCU releases hold and button isn't
+        %% being pressed — drops the relay and cuts power to the whole system.
+        SD -- 12V+ OUT --> PWR_RELAY_COILP
+        PWR_RELAY_COILN --> PWR_LATCH_Q_C(Collector)
+        CG --- PWR_LATCH_Q_E(Emitter)
+        LATCH_NODE((Diode-OR)) -- 1kΩ --> PWR_LATCH_Q_B(Base)
+
+        subgraph PWR_LATCH["Power Latch — small NPN, e.g. BC337"]
+            PWR_LATCH_Q_B
+            PWR_LATCH_Q_C
+            PWR_LATCH_Q_E
+        end
+
+        D_BTN[Diode 1N4148] --> LATCH_NODE
+        D_HOLD[Diode 1N4148] --> LATCH_NODE
 
         %% MOSFET leg wiring (same on all 4 MOSFETs here, TO-220 package, text side facing you,
         %% pins left-to-right = Gate/Drain/Source): White=Gate, Grey=Drain, Black=Source
@@ -25,6 +58,10 @@ flowchart LR
             MOS_R_D
             MOS_R_S
         end
+
+        %% Runs straight to 12V, no separate step-up board needed
+        XT60 -- 36V+ --> SD["XL7015 Step-down<br>(adjusted to 12V output)"]
+        XT60 -- GND --> SD
 
         %% Pin numbers follow top-to-bottom order in the board photo, not a confirmed silkscreen Pin 1 - verify before soldering
         subgraph COMM["VESC COMM Header (6 COMM, MKS ESC Mini Pro V6.70)"]
@@ -46,6 +83,8 @@ flowchart LR
         FE4(OG4 pass-through — Red)
         FE5(OG5 pass-through — Yellow)
         FEN(N1 pass-through — Black)
+        FE_N2(N2 pass-through — Pink)
+        FE_N3(N3 pass-through — Cyan)
     end
 
     %% Wire colors chosen to match the MCU's own ribbon below wherever the STEM's existing 6-wire
@@ -59,8 +98,10 @@ flowchart LR
             OG4["4: 5V+ — Red"]
             OG5["5: 12V+ to front light — Yellow"]
         end
-        subgraph NEW_CABLE[New cable, 1x 0.75mm² — GND]
+        subgraph NEW_CABLE[New cable, 3x 0.75mm² — GND + power-switch control]
             N1["N1: Common GND — Black"]
+            N2["N2: Power button trigger — Pink"]
+            N3["N3: MCU power-hold — Cyan"]
         end
     end
 
@@ -84,11 +125,38 @@ flowchart LR
         PWR12V --> FL_P((Front Light + — Yellow))
         FL_M((Front Light -)) --> MOS_F_D(Drain Pin 2 — Grey)
 
+        %% Power button: single-pole momentary, taps the always-on local 12V rail
+        %% directly (no separate reference voltage needed) and sends a switched-12V
+        %% trigger down N2 to bootstrap the chassis latch — see CHASSIS PWR_LATCH.
+        %% Hold the button briefly (~1s) on power-up: it only needs to bridge the
+        %% gap until the MCU boots and asserts its own hold signal on MCP_GPB0.
+        %%
+        %% The MCU also reads this same button locally (MCP_GPB1) — no second wire
+        %% down to chassis needed, and no second pole on the button either. A
+        %% 10kΩ/3.3kΩ divider on the button's own switched-12V signal scales it to
+        %% ~3V when pressed (0V idle via the bottom resistor to HB_GND), safely
+        %% under the MCP23017's 3.3V logic / 5.5V abs-max. This reads ACTIVE-HIGH,
+        %% unlike BTN_L/BTN_R which are active-low via internal pull-up — see
+        %% power.cpp. Held for 2s while running, it triggers a graceful shutdown
+        %% (zero throttle/brake, stop the VESC, release the hold line); a short tap
+        %% does nothing, so a debounce glitch or bump can't cut power mid-ride.
+        PWR_BTN((Power Button))
+        PWR12V -- 12V+ --> PWR_BTN
+        PWR_BTN --> PWR_BTN_SIG((Switched 12V))
+        PWR_BTN_SIG --> N2
+        PWR_BTN_SIG -- 10kΩ --> PWR_BTN_SENSE((~3V when pressed))
+        PWR_BTN_SENSE -. 3k3 .- HB_GND
+        PWR_BTN_SENSE --> MCP_GPB1
+
         %% GPIO15/21 chosen from the exposed header's free pins (16/17/18 already used for throttle/UART)
-        %% GPIO33/GPIO0 are the last 2 free pins on the header — reused here as I2C SDA/SCL for the
-        %% turn-signal expander (I2C idles high, so GPIO0/BOOT still reads HIGH at power-on/reset)
+        %% GPIO33/GPIO0 were the last 2 free pins on the header. GPIO0/BOOT is a strapping pin that
+        %% gets re-sampled on every chip reset (not just power-on) — a reset landing while I2C toggles
+        %% it low could drop the board into UART download mode instead of resuming firmware, so it's
+        %% left unconnected (N/C, floating) rather than used for SCL.
+        %% Front light moved off the MCU onto the MCP23017 expander (plain on/off, no PWM needed —
+        %% it was never dimmed at runtime anyway) to free GPIO15 for SCL instead.
         %% Colors below are the board's own 12-wire ribbon, fixed top-to-bottom order (pin-definition.png):
-        %% GND=Black, VSYS=Red, RESET=Green, BOOT=Yellow, GND=Black(2nd, same net), 3V3=Red,
+        %% GND=Black, VSYS=Red, RESET=Green, BOOT=Yellow (N/C), GND=Black(2nd, same net), 3V3=Red,
         %% GPIO15=Brown, GPIO16=Orange, GPIO17=Green, GPIO18=Blue, GPIO21=Purple, GPIO33=Grey.
         %% CAUTION: VSYS and 3V3 are both Red on this ribbon — tag one before wiring, since crossing
         %% them feeds 5V into the 3.3V-only MCP23017 (abs max ~5.5V, very little margin).
@@ -96,9 +164,9 @@ flowchart LR
             MCU_GND(GND — Black)
             MCU_VSYS(VSYS - 5V in — Red)
             MCU_RESET(RESET - unused — Green)
-            MCU_SCL(GPIO0/BOOT: I2C SCL — Yellow)
+            MCU_BOOT(GPIO0/BOOT - N/C, do not wire — Yellow)
             MCU_3V3(3V3 - 3.3V out — Red)
-            MCU_FRONT(GPIO15: Front light gate — Brown)
+            MCU_SCL(GPIO15: I2C SCL — Brown)
             MCU_THROTTLE(GPIO16: Throttle ADC — Orange)
             MCU_RX(GPIO17: UART RX — Green)
             MCU_TX(GPIO18: UART TX — Blue)
@@ -106,11 +174,6 @@ flowchart LR
             MCU_SDA(GPIO33: I2C SDA — Grey)
         end
         MCU_GND --- HB_GND
-
-        %% Front MOSFET lives locally at the handlebars, so no extra conductor is needed for its gate signal
-        MCU_FRONT -- GPIO Front --> R1_100[100Ω] --> MOS_F_G(Gate Pin 1 — White)
-        MOS_F_G -. 10kΩ Pull-down .- HB_GND
-        HB_GND --- MOS_F_S(Source Pin 3 — Black)
 
         subgraph MOSFET_FRONT[Front MOSFET IRLB8721]
             MOS_F_G
@@ -130,15 +193,24 @@ flowchart LR
 
         subgraph EXPANDER["MCP23017 I2C GPIO Expander (addr 0x20)"]
             MCP_SDA(SDA — Grey)
-            MCP_SCL(SCL — Yellow)
+            MCP_SCL(SCL — Brown)
             MCP_VDD(VDD — Red)
             MCP_GND(GND — Black)
             MCP_GPA0(GPA0: BTN Left in)
             MCP_GPA1(GPA1: BTN Right in)
             MCP_GPA2(GPA2: Blink Left out)
             MCP_GPA3(GPA3: Blink Right out)
+            MCP_GPA4(GPA4: Front light out)
+            MCP_GPB0(GPB0: Power hold out)
+            MCP_GPB1(GPB1: Power button sense in)
         end
         MCP_GND --- HB_GND
+
+        %% Front MOSFET lives locally at the handlebars, driven from the expander (not the MCU
+        %% directly) — freed GPIO15 on the MCU so I2C SCL could move off GPIO0/BOOT (see MCU note above)
+        MCP_GPA4 -- Gate --> R1_100[100Ω] --> MOS_F_G(Gate Pin 1 — White)
+        MOS_F_G -. 10kΩ Pull-down .- HB_GND
+        HB_GND --- MOS_F_S(Source Pin 3 — Black)
 
         BTN_L((Left Turn /<br>Speed− Button)) --- MCP_GPA0
         BTN_L --- HB_GND
@@ -179,11 +251,16 @@ flowchart LR
     COMM_5V -- "5V+ (Red)" --> FE4 --> OG4 --> PWR5V
     SD -- "12V+ OUT (Yellow)" --> FE5 --> OG5 --> PWR12V
 
-    %% New cable (common ground return for everything above)
+    %% New cable (common ground return, plus the 2 power-switch control signals —
+    %% both logic-level, negligible current, share N1's existing ground return)
     CG -- "GND (Black)" --> FEN --> N1 --> HB_GND
+    N2 -- "Trigger (Pink)" --> FE_N2 --> D_BTN
+    MCP_GPB0 -- "Hold (Cyan)" --> N3 --> FE_N3 --> D_HOLD
 
     %% Wire-color legend (cosmetic node fills matching the physical cable colors described above)
     style N1 fill:#000000,color:#ffffff
+    style N2 fill:#ff69b4,color:#000000
+    style N3 fill:#00bcd4,color:#000000
     style OG1 fill:#1f6feb,color:#ffffff
     style OG2 fill:#2ea043,color:#ffffff
     style OG3 fill:#d3d3d3,color:#000000
@@ -196,9 +273,9 @@ flowchart LR
     style MCU_GND fill:#000000,color:#ffffff
     style MCU_VSYS fill:#d32f2f,color:#ffffff
     style MCU_RESET fill:#2ea043,color:#ffffff
-    style MCU_SCL fill:#e6c400,color:#000000
+    style MCU_BOOT fill:#e6c400,color:#000000,stroke-dasharray: 4 3
+    style MCU_SCL fill:#8b4513,color:#ffffff
     style MCU_3V3 fill:#d32f2f,color:#ffffff
-    style MCU_FRONT fill:#8b4513,color:#ffffff
     style MCU_THROTTLE fill:#ff8c00,color:#000000
     style MCU_RX fill:#2ea043,color:#ffffff
     style MCU_TX fill:#1f6feb,color:#ffffff
@@ -208,12 +285,15 @@ flowchart LR
     style HB_GND fill:#000000,color:#ffffff
     style MCP_GND fill:#000000,color:#ffffff
     style FEN fill:#000000,color:#ffffff
+    style FE_N2 fill:#ff69b4,color:#000000
+    style FE_N3 fill:#00bcd4,color:#000000
     style PWR5V fill:#d32f2f,color:#ffffff
     style MCP_VDD fill:#d32f2f,color:#ffffff
+    style MCP_GPB0 fill:#00bcd4,color:#000000
     style PWR12V fill:#e6c400,color:#000000
     style RL_P fill:#e6c400,color:#000000
     style FL_P fill:#e6c400,color:#000000
-    style MCP_SCL fill:#e6c400,color:#000000
+    style MCP_SCL fill:#8b4513,color:#ffffff
     style MCP_SDA fill:#808080,color:#ffffff
     style FE1 fill:#1f6feb,color:#ffffff
     style FE2 fill:#2ea043,color:#ffffff
@@ -232,5 +312,3 @@ flowchart LR
     style MOS_F_S fill:#000000,color:#ffffff
     style MOS_BL_S fill:#000000,color:#ffffff
     style MOS_BR_S fill:#000000,color:#ffffff
-
-

@@ -5,6 +5,8 @@
 #include "vesc/VescUart.h"
 #include "throttle.h"
 #include "console.h"
+#include "expander.h"
+#include "power.h"
 #include "lights.h"
 #include "blinkers.h"
 #include "ui.h"
@@ -45,6 +47,8 @@ void setup()
     setup_ui();
     lastLvglTickMs = millis();
 
+    expander_init();
+    power_init();
     lights_init();
     blinkers_init();
 
@@ -95,6 +99,7 @@ void loop()
     poll_console(consoleCtx);
 
     blinkers_poll(nowMs, controlProfile);
+    power_poll(nowMs, controlInputs, currentController, vesc);
 
     read_physical_throttle(controlInputs);
     log_physical_throttle(nowMs, controlInputs.enabled);

@@ -1,13 +1,10 @@
 #include "blinkers.h"
 
-#include <Wire.h>
-#include <Adafruit_MCP23X17.h>
+#include "expander.h"
 
 bool unrestrictedModeActive = false;
 
 namespace {
-
-Adafruit_MCP23X17 mcp;
 
 bool blinkerLeftOn  = false;
 bool blinkerRightOn = false;
@@ -41,9 +38,6 @@ bool poll_button_pressed(DebouncedButton &button, uint32_t nowMs)
 
 void blinkers_init()
 {
-    Wire.begin(MCP23017_SDA_PIN, MCP23017_SCL_PIN);
-    mcp.begin_I2C();
-
     mcp.pinMode(MCP_BTN_LEFT_PIN, INPUT_PULLUP);
     mcp.pinMode(MCP_BTN_RIGHT_PIN, INPUT_PULLUP);
     mcp.pinMode(MCP_BLINK_LEFT_PIN, OUTPUT);

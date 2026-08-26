@@ -1,5 +1,6 @@
 #include "console.h"
 #include "lights.h"
+#include "power.h"
 
 static char   s_lineBuffer[96] = {0};
 static size_t s_lineLength     = 0;
@@ -15,12 +16,12 @@ void print_console_help()
     Serial.println(F("  throttle_log 0|1"));
     Serial.println(F("  brake <0.0..1.0>"));
     Serial.println(F("  stop"));
+    Serial.println(F("  power off"));
     Serial.println(F("  profile drive <amps>"));
     Serial.println(F("  profile brake <amps>"));
     Serial.println(F("  profile speed <taper_kmh> <limit_kmh>"));
     Serial.println(F("  mode unrestricted 0|1"));
     Serial.println(F("  light front 0|1"));
-    Serial.println(F("  light front_brightness <0..255>"));
     Serial.println(F("  light rear_idle <0..255>"));
     Serial.println(F("  light rear_brake <0..255>"));
     Serial.println();
@@ -85,6 +86,16 @@ static void process_console_command(char *line, scooter::ConsoleContext &ctx)
         ctx.inputs.brake    = 0.0f;
         ctx.controller.reset();
         Serial.println(F("Commanded stop."));
+        return;
+    }
+
+    if (strcmp(command, "power") == 0) {
+        char *field = strtok_r(nullptr, " \t", &save);
+        if (field == nullptr || strcmp(field, "off") != 0) {
+            Serial.println(F("Usage: power off"));
+            return;
+        }
+        power_shutdown(ctx.inputs, ctx.controller, ctx.vesc);
         return;
     }
 
@@ -212,7 +223,7 @@ static void process_console_command(char *line, scooter::ConsoleContext &ctx)
     if (strcmp(command, "light") == 0) {
         char *field = strtok_r(nullptr, " \t", &save);
         if (field == nullptr) {
-            Serial.println(F("Usage: light front 0|1 | front_brightness <0..255> | rear_idle <0..255> | rear_brake <0..255>"));
+            Serial.println(F("Usage: light front 0|1 | rear_idle <0..255> | rear_brake <0..255>"));
             return;
         }
 
@@ -224,17 +235,6 @@ static void process_console_command(char *line, scooter::ConsoleContext &ctx)
             }
             frontLightOn = atoi(value) != 0;
             Serial.printf("Front light %s.\n", frontLightOn ? "on" : "off");
-            return;
-        }
-
-        if (strcmp(field, "front_brightness") == 0) {
-            char *value = strtok_r(nullptr, " \t", &save);
-            if (value == nullptr) {
-                Serial.println(F("Usage: light front_brightness <0..255>"));
-                return;
-            }
-            frontLightBrightness = static_cast<uint8_t>(constrain(atoi(value), 0, 255));
-            Serial.printf("Front light brightness set to %u.\n", frontLightBrightness);
             return;
         }
 
